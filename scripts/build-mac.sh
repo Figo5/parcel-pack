@@ -2,10 +2,11 @@
 set -eu
 cd "${0:A:h:h}"
 swift build -c release
+binary_dir=$(swift build -c release --show-bin-path)
 bundle_workspace=$(mktemp -d .build/parcel-pack-bundle.XXXXXX)
 app_bundle="$bundle_workspace/Parcel Pack.app"
 mkdir -p "$app_bundle/Contents/MacOS" "$app_bundle/Contents/Resources" dist
-cp .build/release/ParcelPack "$app_bundle/Contents/MacOS/ParcelPack"
+cp "$binary_dir/ParcelPack" "$app_bundle/Contents/MacOS/ParcelPack"
 cat > "$app_bundle/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

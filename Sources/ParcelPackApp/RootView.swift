@@ -45,6 +45,7 @@ struct RootView: View {
         }
         .background(Palette.background.ignoresSafeArea())
         .tint(Palette.accent)
+        .preferredColorScheme(.light)
     }
 
     @ViewBuilder private var modeContent: some View {

@@ -1,40 +1,40 @@
-# Continue Parcel Pack after the Mac update
+# Continue Parcel Pack on iPhone
 
-Parcel Pack is a native SwiftUI game for iPhone (iOS 17+) with unlimited generated boxes, drag or tap placement, rotation, undo, hints, and local saves. The source is backed up in the private GitHub repository `Figo5/parcel-pack`.
+The checkout is `/Users/giofiore/parcel-pack`, backed up in the private GitHub repository `Figo5/parcel-pack`. The active development branch is `claude/optimistic-johnson-nmx2si`, with scored Shift runs and the original Free pack. Main still contains the original game.
 
-The existing local checkout is `/Users/giofiore/parcel-pack`. If you need to restore it elsewhere:
+As of October 12, Xcode 27.0 is installed, its license/setup is complete, all 33 Swift tests pass, and the iOS Simulator binary compiles. The remaining Xcode platform download must finish before simulator play. No physical phone build has been installed.
+
+## Simulator
+
+1. Let Xcode finish downloading its iOS simulator runtime.
+2. Open `ParcelPack.xcodeproj`, select the **ParcelPack** scheme, and choose an available iPhone simulator as the run destination.
+3. Press **⌘R**. Check drag and tap placement, rotation, undo, shelf carryover, rush deadlines, sealing, the five-box outcome, mode switching, and progress after relaunch.
+
+Use `xcrun simctl list runtimes` to confirm that a runtime is installed. The generic simulator build does not require a booted device:
 
 ```sh
-gh repo clone Figo5/parcel-pack
-cd parcel-pack
+xcodebuild -project ParcelPack.xcodeproj -scheme ParcelPack \
+  -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+  -configuration Debug -derivedDataPath .build/ios CODE_SIGNING_ALLOWED=NO build
 ```
 
-## Finish the iPhone setup
+## Your iPhone
 
-1. Install Xcode compatible with the updated Mac and the iPhone's iOS version. See [Apple's compatibility table](https://developer.apple.com/xcode/system-requirements).
-2. Open Xcode once and finish its initial setup, including the iOS platform components.
-3. Open `ParcelPack.xcodeproj` and select the **ParcelPack** scheme.
-4. In Xcode Settings → Apple Accounts, sign in with your own Apple Account. In the app target's **Signing & Capabilities**, select your Personal Team and automatic signing. Change the bundle identifier if Xcode says it is unavailable.
-5. Connect and unlock the iPhone, trust the Mac, enable Developer Mode if requested, select the phone as the run destination, and press **⌘R**.
+1. In Xcode Settings → Apple Accounts, sign in with your own Apple Account.
+2. In the app target's **Signing & Capabilities**, select your Personal Team and automatic signing. Change the bundle identifier if Xcode says it is unavailable.
+3. Connect and unlock the iPhone, trust the Mac, select the phone as the run destination, and enable Developer Mode if requested.
+4. Press **⌘R**. Check gestures, compact safe areas, sound/haptics, and restored progress on the phone.
 
-Apple's [device run guide](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices) covers the signing and installation steps. A paid developer account is not required for personal device testing; free provisioning has limits and requires renewal.
+Apple's [device run guide](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices) covers signing and installation. A free Personal Team supports personal device testing with periodic reprovisioning; see [Apple's account overview](https://developer.apple.com/help/account/basics/about-your-developer-account). Credentials and local signing settings are excluded from Git. Nothing has been distributed through TestFlight or the App Store.
 
-## Checks for the next development session
-
-The last local run passed all **15 Swift tests** and produced a working native macOS preview. The interface was tested at 430- and 375-point widths. The previous Mac environment had no Xcode or iOS SDK, so **the iOS build, simulator run, physical iPhone install, phone gestures, audio, and haptics remain unverified**.
-
-After Xcode is installed, check `xcode-select -p` and `xcrun --find simctl`. If command-line tools still select the standalone toolchain, select the installed Xcode through its Settings → Locations → Command Line Tools.
-
-Then run:
+## Mac and development
 
 ```sh
 swift test
-xcodebuild -project ParcelPack.xcodeproj -scheme ParcelPack \
-  -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+zsh scripts/build-mac.sh
+open "dist/Parcel Pack.app"
 ```
 
-Test drag placement, invalid/outside drops, tap placement, rotation, undo, hint recovery, finishing a box, next box, changing size, and restoring progress after relaunch. Follow the user through Apple Account authentication if needed; credentials are not stored in this repository.
+Both modes save locally and separately. In-progress Shift quotas survive balance updates. There are no external package dependencies. Build products and local orchestration logs are ignored.
 
-The project has no external package dependencies. Generated builds, provider logs, local user settings and signing credentials are excluded from Git. Nothing has been distributed through TestFlight or the App Store.
-
-For architecture, contributions and prior checks, see `README.md`, `DESIGN.md`, and `VALIDATION.md`.
+See [README.md](README.md), [DESIGN.md](DESIGN.md), and [VALIDATION.md](VALIDATION.md) for rules, architecture, and the completed checks.

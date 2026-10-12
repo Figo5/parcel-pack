@@ -94,3 +94,16 @@ import ParcelCore
         #expect(model.selectedID == parcel.id)
     }
 }
+
+@Suite @MainActor struct ShiftRecordBoundaryTests {
+    @Test func finishingAnotherRunCannotOverflowTheStoredCounter() throws {
+        let name = "ParcelPackShiftRecordLimit.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        ShiftStore(defaults: defaults).saveRecord(ShiftRecord(runsFinished: Int.max))
+        let model = ShiftModel(defaults: defaults)
+        for box in 0..<5 { model.seal(); if box < 4 { model.nextBox() } }
+        #expect(model.record.runsFinished == Int.max)
+        #expect(model.run.phase == .failed)
+    }
+}

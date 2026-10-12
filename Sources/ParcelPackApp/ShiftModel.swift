@@ -204,7 +204,7 @@ final class ShiftModel {
         updated.bestShiftsCleared = max(updated.bestShiftsCleared, run.shiftsCleared)
         updated.bestRunScore = max(updated.bestRunScore, run.runScore)
         if run.phase == .failed {
-            updated.runsFinished += 1
+            if updated.runsFinished < Int.max { updated.runsFinished += 1 }
         }
         record = updated
         store.saveRecord(updated)

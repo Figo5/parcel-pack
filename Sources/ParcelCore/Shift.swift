@@ -53,7 +53,7 @@ public struct ShiftPlan: Equatable, Codable, Sendable {
     public static let boxesPerShift: Int = 5
 
     // Tuning tables. Index = shift number - 1 for targets, parcel size for values.
-    private static let targetPercents: [Int] = [70, 80, 90, 100, 105]
+    private static let targetPercents: [Int] = [80, 95, 105, 115, 120]
     private static let coreBaseValues: [Int] = [0, 0, 1, 1, 2, 2]
     private static let extraBaseValues: [Int] = [0, 0, 0, 2, 3, 3]
 
@@ -71,7 +71,7 @@ public struct ShiftPlan: Equatable, Codable, Sendable {
     public static func targetPercent(for number: Int) -> Int {
         let shift = min(max(number, 1), 1_000)
         if shift <= targetPercents.count { return targetPercents[shift - 1] }
-        return min(130, 105 + 5 * (shift - 5))
+        return min(130, 120 + 5 * (shift - 5))
     }
 
     public static func generate(seed: UInt64, number: Int) -> ShiftPlan {
@@ -264,74 +264,55 @@ public struct FullBoxSolution: Equatable, Sendable {
 }
 
 public enum ShiftSolver: Sendable {
-    /// Maximum total value over exact fills of the box using a subset of `parcels` (each at most once,
-    /// rotations allowed) that include every parcel in `mustInclude`. nil if no exact fill exists,
-    /// if the input is out of range, or if the node cap was hit before any fill was found.
+    /// Highest parcel value among exact fills; a capped search returns a valid lower bound.
     public static func bestFullBox(width: Int, height: Int, parcels: [ShiftParcel],
                                    mustInclude: Set<Int> = []) -> FullBoxSolution? {
         guard (1...25).contains(width), (1...25).contains(height), width * height <= 25,
-              parcels.count <= 20 else { return nil }
-        for id in mustInclude {
-            var present = false
-            for parcel in parcels where parcel.id == id { present = true }
-            if !present { return nil }
-        }
+              parcels.count <= 20, Set(parcels.map(\.id)).count == parcels.count,
+              mustInclude.isSubset(of: Set(parcels.map(\.id))),
+              parcels.allSatisfy({ (1...4).contains($0.value) && (1...5).contains($0.cells.count)
+                  && Set($0.cells).count == $0.cells.count }) else { return nil }
 
         let cellCount = width * height
-        let fullMask: UInt64 = (UInt64(1) << UInt64(cellCount)) - 1
+        let fullMask: UInt64 = (1 << cellCount) - 1
         var options: [SolverOption] = []
-        var cellOptions: [[Int]] = Array(repeating: [], count: cellCount)
+        var cellOptions = Array(repeating: [Int](), count: cellCount)
         var mustMask: UInt64 = 0
-
         for (index, parcel) in parcels.enumerated() {
-            if mustInclude.contains(parcel.id) { mustMask |= UInt64(1) << UInt64(index) }
-            var shapes: [[Cell]] = []
+            if mustInclude.contains(parcel.id) { mustMask |= 1 << index }
+            var shapes = Set<[Cell]>()
             for rotation in 0..<4 {
                 let shape = turn(parcel.cells, rotation: rotation)
-                guard !shape.isEmpty, Set(shape).count == shape.count, !shapes.contains(shape) else { continue }
-                shapes.append(shape)
+                guard !shape.isEmpty, shapes.insert(shape).inserted else { continue }
                 let shapeWidth = (shape.map(\.x).max() ?? 0) + 1
                 let shapeHeight = (shape.map(\.y).max() ?? 0) + 1
                 guard shapeWidth <= width, shapeHeight <= height else { continue }
-                for originY in 0...(height - shapeHeight) {
-                    for originX in 0...(width - shapeWidth) {
-                        var boardIndices: [Int] = []
+                for y in 0...(height - shapeHeight) {
+                    for x in 0...(width - shapeWidth) {
                         var mask: UInt64 = 0
-                        for cell in shape {
-                            let boardIndex = (originY + cell.y) * width + originX + cell.x
-                            boardIndices.append(boardIndex)
-                            mask |= UInt64(1) << UInt64(boardIndex)
-                        }
-                        let optionIndex = options.count
-                        let placement = Placement(parcelID: parcel.id, origin: Cell(x: originX, y: originY), rotation: rotation)
-                        options.append(SolverOption(mask: mask, parcelIndex: index, value: parcel.value, placement: placement))
-                        for boardIndex in boardIndices { cellOptions[boardIndex].append(optionIndex) }
+                        let indices = shape.map { (y + $0.y) * width + x + $0.x }
+                        for cell in indices { mask |= 1 << cell }
+                        let option = options.count
+                        options.append(SolverOption(mask: mask, parcelIndex: index, value: parcel.value,
+                            placement: Placement(parcelID: parcel.id, origin: Cell(x: x, y: y), rotation: rotation)))
+                        for cell in indices { cellOptions[cell].append(option) }
                     }
                 }
             }
         }
-
-        var search = ShiftSearch(fullMask: fullMask, mustMask: mustMask, cellCount: cellCount,
-                                 options: options, cellOptions: cellOptions)
-        guard search.complete(0, 0) != ShiftSearch.invalid else { return nil }
-
-        // Rebuild the fill from the recorded choices, checking every step, so the result is always a real fill.
-        var placements: [Placement] = []
-        var total = 0
-        var mask: UInt64 = 0
-        var used: UInt64 = 0
-        while mask != fullMask {
-            guard placements.count < cellCount, let chosen = search.choice[mask | (used << 25)] else { return nil }
-            let option = options[chosen]
-            let bit = UInt64(1) << UInt64(option.parcelIndex)
-            guard (mask & option.mask) == 0, (used & bit) == 0 else { return nil }
-            placements.append(option.placement)
-            total += option.value
-            mask |= option.mask
-            used |= bit
+        for cell in cellOptions.indices {
+            cellOptions[cell].sort {
+                if options[$0].value != options[$1].value { return options[$0].value > options[$1].value }
+                return $0 < $1
+            }
         }
-        guard (used & mustMask) == mustMask else { return nil }
-        return FullBoxSolution(value: total, placements: placements, exhaustive: search.exhaustive)
+        var search = ShiftSearch(fullMask: fullMask, mustMask: mustMask, cellCount: cellCount,
+            options: options, cellOptions: cellOptions,
+            areas: parcels.map { $0.cells.count }, values: parcels.map(\.value))
+        search.complete(mask: 0, used: 0, value: 0)
+        guard search.bestValue >= 0 else { return nil }
+        return FullBoxSolution(value: search.bestValue,
+            placements: search.bestPath.map { options[$0].placement }, exhaustive: search.exhaustive)
     }
 }
 
@@ -343,85 +324,87 @@ private struct SolverOption {
 }
 
 private struct ShiftSearch {
-    static let invalid = Int.min / 2
     static let nodeCap = 500_000
-
     let fullMask: UInt64
     let mustMask: UInt64
     let cellCount: Int
     let options: [SolverOption]
     let cellOptions: [[Int]]
-    var memo: [UInt64: Int] = [:]
-    var choice: [UInt64: Int] = [:]
+    let areas: [Int]
+    let values: [Int]
+    var bounds: [UInt64: Int] = [:]
+    var visited = Set<UInt64>()
+    var path: [Int] = []
+    var bestPath: [Int] = []
+    var bestValue = -1
     var nodes = 0
     var exhaustive = true
 
-    init(fullMask: UInt64, mustMask: UInt64, cellCount: Int, options: [SolverOption], cellOptions: [[Int]]) {
-        self.fullMask = fullMask
-        self.mustMask = mustMask
-        self.cellCount = cellCount
-        self.options = options
-        self.cellOptions = cellOptions
+    // Ignore shapes but require the remaining parcel areas to fill the remaining capacity exactly.
+    // This can overestimate the achievable value, so pruning cannot discard a better real fill.
+    mutating func upperBound(used: UInt64) -> Int {
+        if let cached = bounds[used] { return cached }
+        var capacity = cellCount
+        var requiredValue = 0
+        for i in areas.indices {
+            let bit: UInt64 = 1 << i
+            if used & bit != 0 { capacity -= areas[i] }
+            else if mustMask & bit != 0 {
+                capacity -= areas[i]
+                requiredValue += values[i]
+            }
+        }
+        guard capacity >= 0 else { bounds[used] = -1; return -1 }
+        var dp = Array(repeating: -1, count: capacity + 1)
+        dp[0] = 0
+        for i in areas.indices where used & (1 << i) == 0 && mustMask & (1 << i) == 0 {
+            let area = areas[i]
+            guard area <= capacity else { continue }
+            for space in stride(from: capacity, through: area, by: -1) where dp[space - area] >= 0 {
+                dp[space] = max(dp[space], dp[space - area] + values[i])
+            }
+        }
+        let bound = dp[capacity] < 0 ? -1 : requiredValue + dp[capacity]
+        bounds[used] = bound
+        return bound
     }
 
-    // Best completion value from this state (sum of parcel values), or `invalid`.
-    mutating func complete(_ mask: UInt64, _ used: UInt64) -> Int {
+    mutating func complete(mask: UInt64, used: UInt64, value: Int) {
         if mask == fullMask {
-            return (used & mustMask) == mustMask ? 0 : ShiftSearch.invalid
+            if used & mustMask == mustMask && value > bestValue {
+                bestValue = value
+                bestPath = path
+            }
+            return
         }
+        let bound = upperBound(used: used)
+        guard bound >= 0, value + bound > bestValue else { return }
         let key = mask | (used << 25)
-        if let cached = memo[key] { return cached }
-        if nodes >= ShiftSearch.nodeCap {
-            exhaustive = false
-            return ShiftSearch.invalid
-        }
+        guard !visited.contains(key) else { return }
+        guard nodes < Self.nodeCap else { exhaustive = false; return }
         nodes += 1
+        visited.insert(key)
 
-        // Branch on the empty cell with the fewest viable options. An empty cell with none is a dead end.
         var branch: [Int] = []
         var fewest = Int.max
-        for cell in 0..<cellCount {
-            let bit = UInt64(1) << UInt64(cell)
-            if (mask & bit) != 0 { continue }
-            var candidates: [Int] = []
-            for option in cellOptions[cell] {
-                let entry = options[option]
-                let parcelBit = UInt64(1) << UInt64(entry.parcelIndex)
-                if (entry.mask & mask) == 0 && (used & parcelBit) == 0 {
-                    candidates.append(option)
-                }
+        for cell in 0..<cellCount where mask & (1 << cell) == 0 {
+            let candidates = cellOptions[cell].filter {
+                let option = options[$0]
+                return option.mask & mask == 0 && used & (1 << option.parcelIndex) == 0
             }
-            if candidates.isEmpty {
-                memo[key] = ShiftSearch.invalid
-                return ShiftSearch.invalid
-            }
+            guard !candidates.isEmpty else { return }
             if candidates.count < fewest {
                 fewest = candidates.count
                 branch = candidates
             }
         }
-
-        var best = ShiftSearch.invalid
-        var bestOption = -1
-        for option in branch {
-            let entry = options[option]
-            let nextMask = mask | entry.mask
-            let nextUsed = used | (UInt64(1) << UInt64(entry.parcelIndex))
-            let rest = complete(nextMask, nextUsed)
-            if rest == ShiftSearch.invalid { continue }
-            let total = entry.value + rest
-            if bestOption < 0 || total > best {
-                best = total
-                bestOption = option
-            }
+        for i in branch {
+            let option = options[i]
+            path.append(i)
+            complete(mask: mask | option.mask, used: used | (1 << option.parcelIndex), value: value + option.value)
+            path.removeLast()
+            if !exhaustive { return }
         }
-        if bestOption < 0 {
-            memo[key] = ShiftSearch.invalid
-            return ShiftSearch.invalid
-        }
-        memo[key] = best
-        choice[key] = bestOption
-        return best
     }
 }
 
@@ -629,7 +612,7 @@ public struct ShiftRun: Equatable, Codable, Sendable {
         let lateFees = ShiftRun.lateFee * lateCount
         // Late shelf parcels were still packable this box, so they count toward the best fill.
         let solution = ShiftSolver.bestFullBox(width: width, height: height, parcels: parcels, mustInclude: [])
-        let bestFull: Int? = solution.map { $0.value * 2 }
+        let bestFull: Int? = solution.flatMap { $0.exhaustive ? $0.value * 2 : nil }
         shelfIDs.removeAll(where: { lateShelfIDs.contains($0) })
         parcels.removeAll(where: { lateShelfIDs.contains($0.id) })
 
@@ -677,9 +660,11 @@ public struct ShiftRun: Equatable, Codable, Sendable {
 
     // Persistence check. Scores may be negative (late fees), so only their bounds and consistency are checked.
     public var isValid: Bool {
-        guard plan.number >= 1 else { return false }
+        guard plan.number >= 1, plan.number < Int.max - 1,
+              plan.seed == Self.planSeed(runSeed: runSeed, number: plan.number) else { return false }
         let regenerated = ShiftPlan.generate(seed: plan.seed, number: plan.number)
         guard regenerated.number == plan.number, regenerated.seed == plan.seed, regenerated.boxes == plan.boxes,
+              plan.target > 0, plan.target <= regenerated.reference * 2,
               (0..<ShiftPlan.boxesPerShift).contains(boxIndex) else { return false }
 
         let lastBox = boxIndex == ShiftPlan.boxesPerShift - 1
@@ -690,7 +675,8 @@ public struct ShiftRun: Equatable, Codable, Sendable {
         }
 
         let parcelIDs = Set(parcels.map(\.id))
-        guard parcelIDs.count == parcels.count else { return false }
+        guard parcelIDs.count == parcels.count, parcels.count <= box.parcels.count + Self.shelfCapacity else { return false }
+        if phase == .packing && !Set(box.parcels.map(\.id)).isSubset(of: parcelIDs) { return false }
         for item in parcels {
             var arrived = false
             for k in 0...boxIndex where plan.boxes[k].parcels.contains(item) { arrived = true }
@@ -722,7 +708,9 @@ public struct ShiftRun: Equatable, Codable, Sendable {
             if let best = result.bestFull, !(0...10_000).contains(best) { return false }
             scoreSum += result.score
         }
-        guard scoreSum == shiftScore, shiftsCleared >= 0,
+        guard scoreSum == shiftScore, shiftsCleared >= 0, shiftsCleared <= plan.number,
+              phase != .cleared || shiftScore >= plan.target,
+              phase != .failed || shiftScore < plan.target,
               (-1_000_000_000...1_000_000_000).contains(runScore) else { return false }
         return true
     }

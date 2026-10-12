@@ -33,7 +33,6 @@ struct ShiftView: View {
                     if run.phase == .packing {
                         shelfRow
                         tray
-                        controls
                     } else {
                         resultCard
                     }
@@ -45,6 +44,16 @@ struct ShiftView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollDisabled(drag != nil)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if run.phase == .packing {
+                controls
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: 520)
+                    .frame(maxWidth: .infinity)
+                    .background(Palette.background)
+            }
         }
         .overlay(alignment: .topLeading) { floatingPiece }
         .coordinateSpace(.named(packingSpace))
@@ -71,7 +80,7 @@ struct ShiftView: View {
     }
 
     private func boardWidth(for size: CGSize) -> CGFloat {
-        min(size.width - 32, max(200, size.height * 0.36), 400)
+        min(size.width - 32, max(236, size.height * 0.36), 400)
     }
 
     // MARK: Header
@@ -515,10 +524,10 @@ struct ShiftView: View {
 
     private func bestNote(for result: BoxResult) -> String? {
         guard let best = result.bestFull else { return nil }
-        if result.score >= best {
-            return "Best full box: \(best) \u{2014} you matched it!"
+        if result.full && result.packedValue * 2 >= best {
+            return "Best full box: \(best) \u{2014} matched before late fees."
         }
-        return "Best full box: \(best)"
+        return "Best full box: \(best) before late fees."
     }
 
     @ViewBuilder private var shiftSummary: some View {
@@ -643,8 +652,8 @@ private struct ShiftHelpSheet: View {
                 Section("Shift rules") {
                     Label("Each box comes with more parcels than fit. There is always a way to fill it exactly.", systemImage: "shippingbox")
                     Label("Seal to ship. Score the packed values \u{2014} a completely full box scores double.", systemImage: "checkmark.seal")
-                    Label("The shelf keeps up to 3 parcels for later boxes. Tray parcels are sent back when you seal.", systemImage: "tray.and.arrow.down")
-                    Label("Rush parcels must ship by their due box, or pay a late fee of 5.", systemImage: "clock.badge.exclamationmark")
+                    Label("The shelf keeps up to 3 parcels for later boxes in this shift. Tray parcels are sent back when you seal.", systemImage: "tray.and.arrow.down")
+                    Label("Returning a rush parcel, or keeping it on the shelf through its due box, costs 5 points.", systemImage: "clock.badge.exclamationmark")
                     Label("Reach the target in 5 boxes to clear the shift. Miss it and the run ends.", systemImage: "flag.checkered")
                 }
                 Section("Take your time") {

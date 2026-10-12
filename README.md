@@ -1,63 +1,65 @@
 # Parcel Pack
 
-A native SwiftUI packing puzzle for iPhone. Fit every colorful parcel into its cardboard box. No timer, ads, accounts, lives, purchases, or network dependency. New boxes are generated on-device with guaranteed solutions.
-
-Continuing after updating this Mac? Start with [AFTER_UPDATE.md](AFTER_UPDATE.md).
+A native SwiftUI packing puzzle for iPhone and Mac. Choose a scored **Shift** run or the original untimed **Free pack**. Boxes are generated on-device. No timer, ads, purchases, accounts, or network dependency.
 
 ## Play
 
-- Drag a parcel from the tray into the box. It lifts above your finger so you can see the landing spot.
-- Or tap a parcel, then tap the square for its top-left corner. This also works with VoiceOver.
-- Select a parcel and tap **Rotate** to turn it clockwise.
-- Tap a placed parcel to take it out. **Undo** returns the last placed parcel.
-- **Hint** packs one parcel that leaves a way to finish. If an earlier placement blocks completion, it unpacks enough parcels to find a route forward and tells you what changed.
-- Fill the box and tap **Next box**. Small is 4×4; Medium is 5×4; Large is 5×5.
-- The current box, rotations, preferences and shipped count are saved locally. Repacking the same box does not count it twice.
+Drag a parcel into the cardboard box, or select it and tap the square for its top-left corner. **Rotate** turns the selected parcel. Tap a packed parcel to remove it; **Undo** removes your last placement. Every fresh box has an exact fill, but Shift gives you more parcels than fit.
 
-## Install on your iPhone
+### Shift
 
-This checkout includes **ParcelPack.xcodeproj** and a shared **ParcelPack** scheme. Requires iOS 17 or later and Xcode 16 or later with the iOS platform installed. Choose an Xcode release compatible with both your Mac and your iPhone's iOS version using [Apple's compatibility table](https://developer.apple.com/xcode/system-requirements). This Mac runs macOS 15.7.9, which supports Xcode 26.3; newer Xcode releases may require a macOS upgrade.
+- Each parcel is worth 1–4 points. Pack any subset and **Seal & ship** when ready. A full box doubles the packed value.
+- Keep up to three spare parcels on the **Shelf** for later boxes in the same shift. Unshelve them or pack directly from the shelf. Tray leftovers are returned when you seal.
+- Rush deadlines count boxes, not seconds. Returning a rush parcel early or keeping it on the shelf through its due box costs five points. Ordinary returns have no fee.
+- Meet the target across five boxes to clear the shift and continue the run. Later shifts ask for more valuable packing and better shelf choices. Missing the target ends the run.
+- A shipped box shows its scoring breakdown and the best full-box value available before late fees. The shelf clears between shifts; your best run and current progress save locally.
 
-1. Install [Xcode from Apple](https://developer.apple.com/xcode/), then open `ParcelPack.xcodeproj`.
-2. In Xcode → Settings → Apple Accounts, sign in with your own Apple Account.
-3. Select the **ParcelPack** target → **Signing & Capabilities**. Choose your Personal Team and leave automatic signing enabled. If the bundle identifier is unavailable, change it to a unique identifier of your own.
-4. Connect and unlock your iPhone, trust the Mac, and select the iPhone as the run destination. Enable Developer Mode on the phone if Xcode requests it.
-5. Press **Run** (⌘R). If iOS asks you to trust the developer, follow the prompt in Settings. The installed app then plays offline.
+### Free pack
 
-A paid developer membership is not required for personal device testing; Apple's free Personal Team provisioning has limits and needs periodic renewal. TestFlight/App Store distribution is a separate step. See [Apple's device run guide](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices) and [membership comparison](https://developer.apple.com/support/compare-memberships/).
+Fit every parcel into the box. **Hint** places one parcel while keeping a route to completion; it can unpack blocking placements and explains the change. Choose Small (4×4), Medium (5×4), or Large (5×5), then move to another generated box after finishing. The existing box, rotations, settings, and shipped count stay saved separately from Shift.
 
-## Development
-
-There are no external package dependencies. Core generation, placement, hints, persistence and app lifecycle tests run with the Swift command line toolchain:
-
-```sh
-swift test
-```
-
-The same SwiftUI interface compiles as a native macOS app for local verification:
+## Play on this Mac
 
 ```sh
 zsh scripts/build-mac.sh
 open "dist/Parcel Pack.app"
 ```
 
-The iPhone Xcode target compiles the shared Swift files directly. SwiftPM compiles the core as a separate module. Conditional imports support both arrangements. After adding source files, regenerate the project with:
+The build script packages the current SwiftPM release binary into a native app. There are no external package dependencies.
+
+## Install on your iPhone
+
+Open **ParcelPack.xcodeproj** and choose the shared **ParcelPack** scheme. The target supports iOS 17 or later; the current checkout has been compiled with Xcode 27.0, Swift 6.4, and the iOS Simulator 27.0 SDK.
+
+1. Finish Xcode's platform downloads. For simulator play, choose an installed iPhone simulator as the run destination and press **⌘R**.
+2. For your phone, sign in through Xcode Settings → Apple Accounts. Select the ParcelPack target → **Signing & Capabilities**, choose your Personal Team, and leave automatic signing enabled. Use a unique bundle identifier if Xcode requests one.
+3. Connect and unlock the iPhone, trust the Mac, and select the phone as the run destination. Enable Developer Mode if requested, then press **⌘R**.
+
+Apple's [device run guide](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices) covers installation. A free Personal Team supports personal device testing with periodic reprovisioning; see [Apple's account overview](https://developer.apple.com/help/account/basics/about-your-developer-account). TestFlight and App Store distribution require separate preparation and have not been performed.
+
+## Development
 
 ```sh
-python3 scripts/generate-project.py
-```
-
-To build for the iPhone simulator once Xcode is installed:
-
-```sh
+swift test
 xcodebuild -project ParcelPack.xcodeproj -scheme ParcelPack \
-  -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+  -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+  -configuration Debug -derivedDataPath .build/ios CODE_SIGNING_ALLOWED=NO build
 ```
 
-## Verification status
+The Xcode target compiles the shared Swift files directly. SwiftPM compiles ParcelCore as a separate module; conditional imports support both. After adding source files, regenerate the project with `python3 scripts/generate-project.py`.
 
-The development Mac initially had Swift 6.1.2 and the macOS SDK, but no Xcode, iOS SDK or iPhone simulator. The iOS project can be inspected and packaged here; an iOS compilation and physical iPhone installation require Xcode. Detailed final checks are recorded in `VALIDATION.md`.
+To reproduce the balance sample against the actual Swift engine:
 
-## Contributions
+```sh
+swiftc -O Sources/ParcelCore/Packing.swift Sources/ParcelCore/Shift.swift \
+  scripts/measure-shift-balance.swift -o /tmp/parcel-shift-balance
+/tmp/parcel-shift-balance 100
+```
 
-Claude Code contributed the SwiftUI presentation. DeepSeek through OpenCode Go reviewed the state and persistence code; its initial engine task reached its reasoning limit without producing code. Codex implemented the puzzle engine and tests, state model, persistence, Xcode packaging, integration and verification. Provider credentials stay in their existing stores; orchestration logs are excluded from the app.
+This samples 100 independent seeds for each of shifts 1–10, comparing reference packing with a strong per-box strategy that manages rush parcels and the shelf. It reports JSON lines; it is not a human difficulty estimate or a globally optimal run solver.
+
+## Verification and contributions
+
+**33 Swift tests pass**, the native Mac app has been played, and the generic iOS Simulator build succeeds. Simulator gameplay awaits the runtime download; physical iPhone gestures, audio, haptics, and signing remain to be checked. See [VALIDATION.md](VALIDATION.md), [DESIGN.md](DESIGN.md), and [AFTER_UPDATE.md](AFTER_UPDATE.md).
+
+Claude contributed the initial SwiftUI presentation and the Shift rules, model, and interface. Codex implemented the original puzzle core and packaging, then completed Shift with a faster value solver, balance measurements, save validation, native layout fixes, and core tests. The original focused persistence review used DeepSeek through OpenCode Go. Provider credentials and orchestration logs are excluded from the repository and game.
