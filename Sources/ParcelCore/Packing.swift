@@ -6,7 +6,7 @@ public struct Cell: Hashable, Codable, Sendable {
     public init(x: Int, y: Int) { self.x = x; self.y = y }
 }
 
-private func normalized(_ cells: [Cell]) -> [Cell] {
+func normalized(_ cells: [Cell]) -> [Cell] {
     guard !cells.isEmpty, cells.count <= 25,
           cells.allSatisfy({ (-64...64).contains($0.x) && (-64...64).contains($0.y) }),
           let minX = cells.map(\.x).min(), let minY = cells.map(\.y).min() else { return [] }
@@ -14,7 +14,7 @@ private func normalized(_ cells: [Cell]) -> [Cell] {
         .sorted { $0.y == $1.y ? $0.x < $1.x : $0.y < $1.y }
 }
 
-private func turn(_ cells: [Cell], rotation: Int) -> [Cell] {
+func turn(_ cells: [Cell], rotation: Int) -> [Cell] {
     var result = normalized(cells)
     let turns = ((rotation % 4) + 4) % 4
     for _ in 0..<turns { result = normalized(result.map { Cell(x: -$0.y, y: $0.x) }) }
@@ -49,7 +49,7 @@ public struct Placement: Equatable, Codable, Sendable {
     }
 }
 
-private struct SeededRandom {
+struct SeededRandom {
     var state: UInt64
     mutating func next() -> UInt64 {
         state &+= 0x9E3779B97F4A7C15

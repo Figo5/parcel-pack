@@ -29,13 +29,13 @@ extension Color {
     }
 }
 
-private extension Array where Element == Cell {
+extension Array where Element == Cell {
     var extent: (cols: Int, rows: Int) {
         ((map(\.x).max() ?? 0) + 1, (map(\.y).max() ?? 0) + 1)
     }
 }
 
-private struct BoardRectKey: PreferenceKey {
+struct BoardRectKey: PreferenceKey {
     static let defaultValue = CGRect.zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         let next = nextValue()
@@ -43,7 +43,7 @@ private struct BoardRectKey: PreferenceKey {
     }
 }
 
-private let packingSpace = "packing"
+let packingSpace = "packing"
 
 // MARK: - Game
 
@@ -499,7 +499,7 @@ struct PieceView: View {
 
 // MARK: - Styles & sheets
 
-private struct PillButtonStyle: ButtonStyle {
+struct PillButtonStyle: ButtonStyle {
     var filled = false
 
     func makeBody(configuration: Configuration) -> some View {
