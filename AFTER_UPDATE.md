@@ -2,7 +2,7 @@
 
 The checkout is `/Users/giofiore/parcel-pack`, backed up in the private GitHub repository `Figo5/parcel-pack`. The active development branch is `claude/optimistic-johnson-nmx2si`, with scored Shift runs and the original Free pack. Main still contains the original game.
 
-As of October 12, Xcode 27.0 is installed, its license/setup is complete, all 41 Swift tests pass, and the iOS Simulator binary compiles and runs on an iPhone 18 Pro with iOS 27.0. The simulator runtime download is complete. No physical phone build has been installed.
+As of October 12, Xcode 27.0 is installed, its license/setup is complete, all 41 Swift tests pass, and the iOS Simulator binary compiles and runs on an iPhone 18 Pro with iOS 27.0. The simulator runtime download is complete. The signed app has also been installed and opened on the user’s physical iPhone 15 running iOS 26.7.1. Apple Account sign-in, Developer Mode, and developer trust are complete.
 
 ## Simulator
 
@@ -23,7 +23,9 @@ xcodebuild -project ParcelPack.xcodeproj -scheme ParcelPack \
 1. In Xcode Settings → Apple Accounts, sign in with your own Apple Account.
 2. In the app target's **Signing & Capabilities**, select your Personal Team and automatic signing. Change the bundle identifier if Xcode says it is unavailable.
 3. Connect and unlock the iPhone, trust the Mac, select the phone as the run destination, and enable Developer Mode if requested.
-4. Press **⌘R**. Check gestures, compact safe areas, sound/haptics, and restored progress on the phone.
+4. Press **⌘R**. If iOS asks, trust your own developer entry in Settings → General → VPN & Device Management. Check gestures, compact safe areas, sound/haptics, and restored progress on the phone.
+
+The current Personal Team profile expires October 19, 2026 at 4:31 PM Eastern. Reconnect the phone, select it as the Xcode run destination, and run again to refresh the installation. Xcode’s local project changes retain the selected team; those personal signing settings have not been pushed to GitHub.
 
 Apple's [device run guide](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices) covers signing and installation. A free Personal Team supports personal device testing with periodic reprovisioning; see [Apple's account overview](https://developer.apple.com/help/account/basics/about-your-developer-account). Credentials and local signing settings are excluded from Git. Nothing has been distributed through TestFlight or the App Store.
 

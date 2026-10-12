@@ -33,7 +33,7 @@ Open **ParcelPack.xcodeproj** and choose the shared **ParcelPack** scheme. The t
 
 1. Finish Xcode's platform downloads. For simulator play, choose an installed iPhone simulator as the run destination and press **⌘R**.
 2. For your phone, sign in through Xcode Settings → Apple Accounts. Select the ParcelPack target → **Signing & Capabilities**, choose your Personal Team, and leave automatic signing enabled. Use a unique bundle identifier if Xcode requests one.
-3. Connect and unlock the iPhone, trust the Mac, and select the phone as the run destination. Enable Developer Mode if requested, then press **⌘R**.
+3. Connect and unlock the iPhone, trust the Mac, and select the phone as the run destination. Enable Developer Mode if requested, then press **⌘R**. If the first launch asks you to trust the developer, use Settings → General → VPN & Device Management on the phone and trust your own developer entry.
 
 Apple's [device run guide](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices) covers installation. A free Personal Team supports personal device testing with periodic reprovisioning; see [Apple's account overview](https://developer.apple.com/help/account/basics/about-your-developer-account). TestFlight and App Store distribution require separate preparation and have not been performed.
 
@@ -60,6 +60,6 @@ This samples 100 independent seeds for each of shifts 1–10, comparing referenc
 
 ## Verification and contributions
 
-**41 Swift tests pass**, the native Mac app builds, and the iOS Simulator build is installed and running on an iPhone 18 Pro simulator. Physical iPhone gestures, audio, haptics, and signing remain to be checked. See [VALIDATION.md](VALIDATION.md), [DESIGN.md](DESIGN.md), and [AFTER_UPDATE.md](AFTER_UPDATE.md).
+**41 Swift tests pass**, the native Mac app builds, and the iOS Simulator build is installed and running on an iPhone 18 Pro simulator. The signed app is also installed and opens on a physical iPhone 15 running iOS 26.7.1. Further phone gesture, audio, and haptic checks remain. See [VALIDATION.md](VALIDATION.md), [DESIGN.md](DESIGN.md), and [AFTER_UPDATE.md](AFTER_UPDATE.md).
 
 Claude contributed the initial SwiftUI presentation and the Shift rules, model, and interface. Codex implemented the original puzzle core and packaging, then completed Shift with a faster value solver, balance measurements, save validation, native layout fixes, and core tests. The original focused persistence review used DeepSeek through OpenCode Go. Provider credentials and orchestration logs are excluded from the repository and game.

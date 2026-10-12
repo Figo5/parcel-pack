@@ -7,7 +7,7 @@ Date: October 12, 2026 (America/New_York).
 - **41 tests pass** with Swift 6.4 in Xcode 27.0 (27A266a): 22 core tests and 19 app model tests.
 - `zsh scripts/build-mac.sh` produces the current native release app. The script now resolves SwiftPM's actual binary directory, including Xcode 27's build layout, instead of potentially copying a stale binary.
 - The ParcelPack Xcode scheme builds successfully for generic iOS Simulator, Debug, using SDK 27.0 with signing disabled. Both arm64 and x86_64 sources compile. The binary is also installed and running on an iPhone 18 Pro simulator with iOS 27.0 in Device Hub.
-- The project includes all nine shared Swift source files, a shared scheme, and the existing 1024×1024 opaque app icon. iOS deployment target remains 17.0.
+- The project includes all ten shared Swift source files, a shared scheme, and the existing 1024×1024 opaque app icon. iOS deployment target remains 17.0.
 
 ## Shift checks
 
@@ -51,9 +51,11 @@ These are independent shift samples, not continuous-run survival rates. The stro
 
 The original checks still pass: 180 generated puzzles across three sizes; 90 hint completion cases; blocked-hint recovery; rotations including extreme inputs; bounds, overlap, duplicate and unknown IDs; alternate tilings; undo/reset; saved box and settings; once-per-box shipment counting; and preservation of lifetime counts when session data is rejected. The original October 8 native play checks included drag cancellation, hints, size confirmation, and compact layout.
 
-## Pending device checks
+## Physical iPhone installation and remaining checks
 
-Xcode is installed and its license/setup is complete. The iOS 27.0 runtime is installed and the game runs on an iPhone 18 Pro simulator. Physical iPhone installation, real finger placement, additional phone sizes and accessibility settings, audio, and haptics remain unverified. No signed IPA, TestFlight upload, or App Store release has been made. Device signing requires the user's Apple Account/team in Xcode.
+Xcode is installed and its license/setup is complete. The iOS 27.0 runtime is installed and the game runs on an iPhone 18 Pro simulator. A signed Debug build was provisioned with the user’s Personal Team, verified with codesign, and installed on a physical iPhone 15 running iOS 26.7.1. The user completed Developer Mode, Keychain authorization, and developer trust, then confirmed Parcel Pack opens. The profile includes the connected device and expires October 19, 2026 at 4:31 PM Eastern. Local Xcode team settings are retained without being committed.
+
+Physical finger placement, additional phone sizes and accessibility settings, audio, and haptics still need focused checks. No IPA, TestFlight upload, or App Store release has been made.
 
 ## Contributions
 
