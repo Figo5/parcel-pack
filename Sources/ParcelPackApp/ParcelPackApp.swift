@@ -6,11 +6,12 @@ import ParcelCore
 @main
 struct ParcelPackApp: App {
     @State private var model = GameModel()
+    @State private var shiftModel = ShiftModel()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
-            GameView(model: model)
+            RootView(game: model, shift: shiftModel)
                 #if os(macOS)
                 .frame(minWidth: 375, idealWidth: 430, minHeight: 700, idealHeight: 850)
                 #endif
@@ -21,7 +22,10 @@ struct ParcelPackApp: App {
         .windowStyle(.hiddenTitleBar)
         #endif
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { model.save() }
+            if phase != .active {
+                model.save()
+                shiftModel.save()
+            }
         }
     }
 }
