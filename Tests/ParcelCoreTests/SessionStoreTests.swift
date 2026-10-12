@@ -10,7 +10,7 @@ import Testing
         let store = SessionStore(defaults: defaults)
         var state = PackingState(puzzle: .generate(seed: 2026, size: .small))
         #expect(state.place(try #require(state.puzzle.solution.first)) == true)
-        let saved = SavedSession(state: state, rotations: [0: 2], shipped: 12, boxNumber: 20)
+        let saved = SavedSession(state: state, shipped: 12, boxNumber: 20)
         #expect(store.save(saved))
         #expect(store.load() == saved)
     }

@@ -12,7 +12,6 @@ import AudioToolbox
 final class ShiftModel {
     private(set) var run: ShiftRun
     var selectedID: Int?
-    private(set) var rotations: [Int: Int]
     private(set) var message: String
     private(set) var record: ShiftRecord
     var showHelp = false
@@ -27,11 +26,12 @@ final class ShiftModel {
         self.defaults = defaults
         store = ShiftStore(defaults: defaults)
         let restored = store.load()
-        let initialRun: ShiftRun = restored?.run ?? ShiftRun(runSeed: Self.newSeed())
+        var initialRun: ShiftRun = restored?.run ?? ShiftRun(runSeed: Self.newSeed())
+        let upgraded = initialRun.useFixedOrientations()
         run = initialRun
-        rotations = restored?.rotations ?? [:]
         record = store.loadRecord()
-        message = restored == nil ? Self.startMessage : Self.resumeMessage(for: initialRun)
+        message = upgraded ? "Place each parcel as shown. Your score and shelf are saved." :
+            (restored == nil ? Self.startMessage : Self.resumeMessage(for: initialRun))
         save()
     }
 
@@ -41,8 +41,6 @@ final class ShiftModel {
         guard let id = selectedID, !run.isPacked(id) else { return nil }
         return run.parcel(id)
     }
-
-    var selectedRotation: Int { selectedID.map { rotations[$0] ?? 0 } ?? 0 }
 
     var selectedIsShelved: Bool {
         guard let id = selectedID else { return false }
@@ -60,17 +58,6 @@ final class ShiftModel {
         message = "Worth \(parcel.value). Tap where its top-left corner should go."
     }
 
-    func rotateSelected() {
-        guard let id = selectedID, selectedParcel != nil else {
-            message = "Choose a parcel to rotate first."
-            return
-        }
-        rotations[id] = (selectedRotation + 1) % 4
-        message = "Turned a quarter turn. Find its new spot."
-        feedback()
-        save()
-    }
-
     // MARK: Packing
 
     @discardableResult
@@ -86,9 +73,9 @@ final class ShiftModel {
     func place(parcelID: Int, x: Int, y: Int) -> Bool {
         guard run.phase == .packing else { return false }
         let placement = Placement(parcelID: parcelID, origin: Cell(x: x, y: y),
-                                  rotation: rotations[parcelID] ?? 0)
+                                  rotation: 0)
         guard run.place(placement) else {
-            message = "That spot doesn't fit. Try another square or rotate the parcel."
+            message = "That spot doesn't fit. Try another square."
             feedback(error: true)
             return false
         }
@@ -106,9 +93,8 @@ final class ShiftModel {
 
     func remove(_ id: Int) {
         guard run.phase == .packing,
-              let placement = run.placements.first(where: { $0.parcelID == id }),
+              run.placements.contains(where: { $0.parcelID == id }),
               run.remove(parcelID: id) else { return }
-        rotations[id] = ((placement.rotation % 4) + 4) % 4
         selectedID = id
         message = "Back in the tray. Tap a square to place it again."
         feedback()
@@ -175,7 +161,6 @@ final class ShiftModel {
     func nextShift() {
         guard run.nextShift() else { return }
         selectedID = nil
-        rotations = [:]
         message = "Shift \(run.plan.number). Target \(run.plan.target)."
         save()
     }
@@ -183,17 +168,13 @@ final class ShiftModel {
     func newRun() {
         run = ShiftRun(runSeed: Self.newSeed())
         selectedID = nil
-        rotations = [:]
         showNewRunConfirm = false
         message = Self.startMessage
         save()
     }
 
     func save() {
-        // Keep rotations only for parcels still in play.
-        let known = Set(run.parcels.map { $0.id })
-        rotations = rotations.filter { known.contains($0.key) }
-        store.save(SavedShift(run: run, rotations: rotations))
+        store.save(SavedShift(run: run))
     }
 
     // MARK: Private

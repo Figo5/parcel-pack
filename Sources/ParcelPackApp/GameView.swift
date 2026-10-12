@@ -285,7 +285,7 @@ struct GameView: View {
             Text(model.message)
                 .font(.subheadline.weight(.medium))
             if model.boxNumber == 1 && model.state.placements.isEmpty && !isComplete {
-                Text("Rotate to turn. Tap a packed parcel to remove it.")
+                Text("Place each parcel as shown. Tap a packed parcel to remove it.")
                     .font(.footnote)
                     .foregroundStyle(Palette.muted)
             }
@@ -304,8 +304,7 @@ struct GameView: View {
     private func traySlot(_ parcel: Parcel) -> some View {
         let packed = model.state.placements.contains { $0.parcelID == parcel.id }
         let selected = !packed && model.selectedID == parcel.id
-        let rotation = rotation(for: parcel.id)
-        let cells = parcel.cells(rotation: rotation)
+        let cells = parcel.cells(rotation: 0)
         let e = cells.extent
         return ZStack {
             if packed {
@@ -333,8 +332,7 @@ struct GameView: View {
         .gesture(dragGesture(parcel.id), including: packed ? .subviews : .all)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Parcel \(parcel.id + 1), \(parcel.cells.count) squares, \(e.cols) wide by \(e.rows) tall")
-        .accessibilityValue(packed ? "Packed" : [selected ? "Selected" : nil, "rotated \(rotation * 90) degrees"]
-            .compactMap { $0 }.joined(separator: ", "))
+        .accessibilityValue(packed ? "Packed" : (selected ? "Selected" : "Unpacked"))
         .accessibilityAddTraits(packed ? [] : (selected ? [.isButton, .isSelected] : .isButton))
         .accessibilityHint(packed ? "Tap it in the box to take it out." : "Double tap to select, then choose a square in the box.")
         .accessibilityAction { if !packed { model.select(parcel.id) } }
@@ -353,8 +351,6 @@ struct GameView: View {
         HStack(spacing: 8) {
             Button { model.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
                 .disabled(model.state.placements.isEmpty)
-            Button { model.rotateSelected() } label: { Label("Rotate", systemImage: "rotate.right") }
-                .disabled(model.selectedParcel == nil)
             Button { model.hint() } label: { Label("Hint", systemImage: "lightbulb") }
         }
         .buttonStyle(PillButtonStyle())
@@ -409,7 +405,7 @@ struct GameView: View {
         let inBounds = origin.x >= 0 && origin.y >= 0
             && origin.x + e.cols <= puzzle.width && origin.y + e.rows <= puzzle.height
         let valid = inBounds && model.state.canPlace(
-            Placement(parcelID: d.parcelID, origin: origin, rotation: rotation(for: d.parcelID)))
+            Placement(parcelID: d.parcelID, origin: origin, rotation: 0))
         return DropTarget(origin: origin, inBounds: inBounds, valid: valid)
     }
 
@@ -435,8 +431,7 @@ struct GameView: View {
     // MARK: Helpers
 
     private func parcel(_ id: Int) -> Parcel? { puzzle.parcels.first { $0.id == id } }
-    private func rotation(for id: Int) -> Int { model.rotations[id] ?? 0 }
-    private func cells(for id: Int) -> [Cell]? { parcel(id)?.cells(rotation: rotation(for: id)) }
+    private func cells(for id: Int) -> [Cell]? { parcel(id)?.cells(rotation: 0) }
 }
 
 // MARK: - Pieces
@@ -538,7 +533,8 @@ private struct HelpSheet: View {
                     Label("Fit every parcel into the box. Every box has a perfect fit.", systemImage: "shippingbox")
                     Label("Drag a parcel onto the box. A green outline shows where it lands; red means it won't fit.", systemImage: "hand.draw")
                     Label("Or tap a parcel, then tap the square for its top-left corner.", systemImage: "hand.tap")
-                    Label("Rotate turns the selected parcel. Tap a packed parcel to take it out.", systemImage: "rotate.right")
+                    Label("Place each parcel as shown; no turning.", systemImage: "square.grid.3x3")
+                    Label("Tap a packed parcel to take it out.", systemImage: "tray.and.arrow.up")
                     Label("Stuck? Hint tucks one parcel in. Undo steps back.", systemImage: "lightbulb")
                 }
                 Section("Take your time") {

@@ -9,9 +9,13 @@ import Testing
             var shapeTypes = Set<[Cell]>()
             for seed in 0..<60 {
                 let puzzle = Puzzle.generate(seed: UInt64(seed), size: size)
+                let legacy = Puzzle.generate(seed: UInt64(seed), size: size, fixedOrientations: false)
                 #expect(puzzle == .generate(seed: UInt64(seed), size: size))
+                #expect(puzzle.parcels.map(\.id) == legacy.parcels.map(\.id))
+                #expect(puzzle.solution.map(\.origin) == legacy.solution.map(\.origin))
                 var state = PackingState(puzzle: puzzle)
                 #expect(state.isValid)
+                #expect(puzzle.solution.allSatisfy { $0.rotation == 0 })
                 #expect(puzzle.parcels.count == (size == .small ? 4 : 5))
                 for placement in puzzle.solution { #expect(state.place(placement) == true) }
                 #expect(state.isComplete)
@@ -60,6 +64,7 @@ import Testing
                 if seed.isMultiple(of: 2) { #expect(state.place(state.puzzle.solution.last!) == true) }
                 while !state.isComplete {
                     let hint = try #require(state.hint(), "Missing hint for \(size) seed \(seed)")
+                    #expect(hint.rotation == 0)
                     #expect(state.place(hint) == true)
                 }
                 #expect(state.hint() == nil)
@@ -75,10 +80,20 @@ import Testing
         var state = PackingState(puzzle: puzzle)
         #expect(state.isValid)
         for p in solution.reversed() {
-            #expect(state.place(Placement(parcelID: 3 - p.parcelID, origin: p.origin, rotation: 1)) == true)
+            #expect(state.place(Placement(parcelID: 3 - p.parcelID, origin: p.origin, rotation: 0)) == true)
         }
         #expect(state.isComplete)
         #expect(state.placements != puzzle.solution)
+    }
+
+    @Test func fixedParcelsCannotBeTurnedEvenWhenTheRotatedShapeWouldFit() {
+        let puzzle = Puzzle.generate(seed: 42, size: .small)
+        let reference = puzzle.solution[0]
+        let rotated = Placement(parcelID: reference.parcelID, origin: reference.origin, rotation: 1)
+        var state = PackingState(puzzle: puzzle)
+        let placed = state.place(rotated)
+        #expect(!placed)
+        #expect(state.placements.isEmpty)
     }
 
     @Test func corruptDecodedStateCannotBecomePlayable() throws {

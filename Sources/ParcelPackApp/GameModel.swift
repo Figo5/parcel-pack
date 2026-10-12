@@ -12,7 +12,6 @@ import AudioToolbox
 final class GameModel {
     private(set) var state: PackingState
     var selectedID: Int?
-    private(set) var rotations: [Int: Int]
     private(set) var message = "Drag a parcel in, or select one and tap a square."
     private(set) var shipped: Int
     private(set) var boxNumber: Int
@@ -35,8 +34,7 @@ final class GameModel {
         self.defaults = defaults
         store = SessionStore(defaults: defaults)
         let restored = store.load()
-        state = restored?.state ?? PackingState(puzzle: .generate(seed: Self.newSeed(), size: .small))
-        rotations = restored?.rotations ?? [:]
+        state = restored?.state.usingFixedOrientations() ?? PackingState(puzzle: .generate(seed: Self.newSeed(), size: .small))
         let lifetimeCount = defaults.object(forKey: "parcel-pack.shipped.v1") as? Int ?? 0
         shipped = max(restored?.shipped ?? 0, (0..<Int.max).contains(lifetimeCount) ? lifetimeCount : 0)
         boxNumber = restored?.boxNumber ?? 1
@@ -47,6 +45,8 @@ final class GameModel {
             message = "A perfect fit. Ready to ship!"
         } else if !state.placements.isEmpty {
             message = "Your box is right where you left it."
+        } else if restored?.state.puzzle.isFixedOrientation == false {
+            message = "Place each parcel as shown. Your box now fits without turning."
         }
         save()
     }
@@ -59,7 +59,6 @@ final class GameModel {
     var selectedParcel: Parcel? {
         availableParcels.first { $0.id == selectedID }
     }
-    var selectedRotation: Int { selectedID.map { rotations[$0] ?? 0 } ?? 0 }
     var filledFraction: Double {
         Double(state.occupiedCount) / Double(state.puzzle.width * state.puzzle.height)
     }
@@ -68,17 +67,6 @@ final class GameModel {
         guard availableParcels.contains(where: { $0.id == id }) else { return }
         selectedID = id
         message = "Parcel \(id + 1) selected. Tap where its top-left corner should go."
-    }
-
-    func rotateSelected() {
-        guard let id = selectedID, selectedParcel != nil else {
-            message = "Choose a parcel to rotate first."
-            return
-        }
-        rotations[id] = ((rotations[id] ?? 0) + 1) % 4
-        message = "Turned a quarter turn. Find its new spot."
-        feedback()
-        save()
     }
 
     @discardableResult
@@ -93,9 +81,9 @@ final class GameModel {
     @discardableResult
     func place(parcelID: Int, x: Int, y: Int) -> Bool {
         let placement = Placement(parcelID: parcelID, origin: Cell(x: x, y: y),
-                                  rotation: rotations[parcelID] ?? 0)
+                                  rotation: 0)
         guard state.place(placement) else {
-            message = "That spot doesn't fit. Try another square or rotate the parcel."
+            message = "That spot doesn't fit. Try another square."
             feedback(error: true)
             return false
         }
@@ -114,9 +102,6 @@ final class GameModel {
 
     func remove(_ id: Int) {
         guard state.placements.contains(where: { $0.parcelID == id }) else { return }
-        if let placement = state.placements.first(where: { $0.parcelID == id }) {
-            rotations[id] = ((placement.rotation % 4) + 4) % 4
-        }
         state.remove(parcelID: id)
         selectedID = id
         message = "Parcel \(id + 1) is back on the table."
@@ -151,7 +136,6 @@ final class GameModel {
             return
         }
         state = candidate
-        rotations[placement.parcelID] = ((placement.rotation % 4) + 4) % 4
         selectedID = nil
         if state.isComplete {
             creditCompletion()
@@ -169,7 +153,6 @@ final class GameModel {
     func restart() {
         state.reset()
         selectedID = nil
-        rotations = [:]
         showRestart = false
         message = "Same box, fresh start."
         save()
@@ -196,14 +179,13 @@ final class GameModel {
 
     func save() {
         defaults.set(shipped, forKey: "parcel-pack.shipped.v1")
-        store.save(SavedSession(state: state, rotations: rotations, shipped: shipped,
+        store.save(SavedSession(state: state, shipped: shipped,
                                 boxNumber: boxNumber, completionCredited: completionCredited))
     }
 
     private func startBox(size: BoxSize) {
         state = PackingState(puzzle: .generate(seed: Self.newSeed(), size: size))
         selectedID = nil
-        rotations = [:]
         completionCredited = false
         if boxNumber < Int.max - 1 { boxNumber += 1 }
         showSettings = false

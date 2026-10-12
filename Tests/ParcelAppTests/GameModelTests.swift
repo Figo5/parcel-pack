@@ -44,8 +44,7 @@ import ParcelCore
         #expect(!model.placeSelected(x: -1, y: -1))
         #expect(model.state == before)
         #expect(model.selectedID == parcel.id)
-        for _ in 0..<4 { model.rotateSelected() }
-        #expect(model.selectedRotation == 0)
+        #expect(model.state.placements.allSatisfy { $0.rotation == 0 })
     }
 
     @Test func progressAndSettingsSurviveRelaunch() {

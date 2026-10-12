@@ -4,7 +4,7 @@ A native SwiftUI packing puzzle for iPhone and Mac. Choose a scored **Shift** ru
 
 ## Play
 
-Drag a parcel into the cardboard box, or select it and tap the square for its top-left corner. **Rotate** turns the selected parcel. Tap a packed parcel to remove it; **Undo** removes your last placement. Every fresh box has an exact fill, but Shift gives you more parcels than fit.
+Drag a parcel into the cardboard box, or select it and tap the square for its top-left corner. Parcels stay in the orientation shown in the tray; place them without turning. Tap a packed parcel to remove it; **Undo** removes your last placement. Every fresh box has an exact fill, but Shift gives you more parcels than fit.
 
 ### Shift
 
@@ -16,7 +16,7 @@ Drag a parcel into the cardboard box, or select it and tap the square for its to
 
 ### Free pack
 
-Fit every parcel into the box. **Hint** places one parcel while keeping a route to completion; it can unpack blocking placements and explains the change. Choose Small (4×4), Medium (5×4), or Large (5×5), then move to another generated box after finishing. The existing box, rotations, settings, and shipped count stay saved separately from Shift.
+Fit every parcel into the box. **Hint** places one parcel while keeping a route to completion; it can unpack blocking placements and explains the change. Choose Small (4×4), Medium (5×4), or Large (5×5), then move to another generated box after finishing. The existing box, settings, and shipped count stay saved separately from Shift. Older boxes migrate to fixed shapes, retaining compatible placements and returning incompatible ones to the tray. Earned counts and scores stay saved.
 
 ## Play on this Mac
 
@@ -60,6 +60,6 @@ This samples 100 independent seeds for each of shifts 1–10, comparing referenc
 
 ## Verification and contributions
 
-**33 Swift tests pass**, the native Mac app has been played, and the generic iOS Simulator build succeeds. Simulator gameplay awaits the runtime download; physical iPhone gestures, audio, haptics, and signing remain to be checked. See [VALIDATION.md](VALIDATION.md), [DESIGN.md](DESIGN.md), and [AFTER_UPDATE.md](AFTER_UPDATE.md).
+**41 Swift tests pass**, the native Mac app builds, and the iOS Simulator build is installed and running on an iPhone 18 Pro simulator. Physical iPhone gestures, audio, haptics, and signing remain to be checked. See [VALIDATION.md](VALIDATION.md), [DESIGN.md](DESIGN.md), and [AFTER_UPDATE.md](AFTER_UPDATE.md).
 
 Claude contributed the initial SwiftUI presentation and the Shift rules, model, and interface. Codex implemented the original puzzle core and packaging, then completed Shift with a faster value solver, balance measurements, save validation, native layout fixes, and core tests. The original focused persistence review used DeepSeek through OpenCode Go. Provider credentials and orchestration logs are excluded from the repository and game.

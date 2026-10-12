@@ -16,7 +16,7 @@ import Testing
         return occupied.count == width * height
     }
 
-    // Independent, deliberately simple oracle for tiny boards: first free cell, all parcels and rotations.
+    // Independent fixed-orientation oracle for tiny boards: first free cell and all parcels.
     private func bruteBest(parcels: [ShiftParcel], required: Set<Int>) -> Int? {
         var best: Int?
         func visit(_ occupied: Set<Cell>, _ used: Set<Int>, _ value: Int) {
@@ -26,7 +26,7 @@ import Testing
                 return
             }
             for parcel in parcels where !used.contains(parcel.id) {
-                for rotation in 0..<4 {
+                for rotation in [0] {
                     let shape = parcel.cells(rotation: rotation)
                     for y in 0..<2 { for x in 0..<3 {
                         let footprint = Set(shape.map { Cell(x: x + $0.x, y: y + $0.y) })
@@ -64,10 +64,19 @@ import Testing
         var observedSizes = Set<Int>(), branching = false
         for number in 1...4 { for seed in 1...40 {
             let plan = ShiftPlan.generate(seed: UInt64(seed),number: number)
+            let legacy = ShiftPlan.generate(seed: UInt64(seed), number: number, fixedOrientations: false)
+            #expect(plan.target == legacy.target)
+            for (current, previous) in zip(plan.boxes, legacy.boxes) {
+                #expect(current.parcels.map(\.id) == previous.parcels.map(\.id))
+                #expect(current.parcels.map(\.value) == previous.parcels.map(\.value))
+                #expect(current.parcels.map(\.dueBox) == previous.parcels.map(\.dueBox))
+                #expect(current.coreSolution.map(\.origin) == previous.coreSolution.map(\.origin))
+            }
             #expect((plan == ShiftPlan.generate(seed: UInt64(seed),number: number)))
             #expect((plan.boxes.count == 5))
             #expect((Set(plan.boxes.flatMap { $0.parcels.map(\.id) }).count == plan.boxes.flatMap(\.parcels).count))
             for (index,box) in plan.boxes.enumerated() {
+                #expect(box.coreSolution.allSatisfy { $0.rotation == 0 })
                 #expect((exactFill(box.coreSolution,parcels: box.parcels,width: box.width,height: box.height)))
                 #expect((box.parcels.count == box.coreSolution.count + (number == 1 ? 2 : 3)))
                 #expect((box.parcels.reduce(0) { $0 + $1.cells.count } > box.width * box.height))
@@ -84,6 +93,20 @@ import Testing
         } }
         #expect((observedSizes == [2,3,4,5]))
         #expect((branching))
+    }
+
+    @Test func fixedOrientationSolverCannotTurnAVerticalParcelToFillAHorizontalBox() {
+        let vertical = ShiftParcel(id: 1, cells: [Cell(x: 0, y: 0), Cell(x: 0, y: 1)], colorIndex: 0, value: 3, dueBox: nil)
+        #expect(ShiftSolver.bestFullBox(width: 2, height: 1, parcels: [vertical]) == nil)
+        let upright = ShiftSolver.bestFullBox(width: 1, height: 2, parcels: [vertical])
+        #expect(upright?.value == 3)
+        #expect(upright?.placements.allSatisfy { $0.rotation == 0 } == true)
+        var run = ShiftRun(runSeed: 42)
+        let reference = run.box.coreSolution[0]
+        let turned = Placement(parcelID: reference.parcelID, origin: reference.origin, rotation: 1)
+        let placed = run.place(turned)
+        #expect(!placed)
+        #expect(run.placements.isEmpty)
     }
 
     @Test func generatedBoxesSolveExhaustivelyAndNeverScoreBelowTheReference() throws {

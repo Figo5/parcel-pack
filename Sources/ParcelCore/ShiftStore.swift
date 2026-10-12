@@ -28,6 +28,7 @@ public struct SavedShift: Codable, Equatable, Sendable {
 
     public var isValid: Bool {
         guard version == 1, run.isValid else { return false }
+        guard !run.plan.isFixedOrientation || rotations.values.allSatisfy({ $0 == 0 }) else { return false }
         for (parcelID, rotation) in rotations {
             guard run.parcel(parcelID) != nil, (0..<4).contains(rotation) else { return false }
         }

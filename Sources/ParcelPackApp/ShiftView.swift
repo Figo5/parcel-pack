@@ -338,8 +338,7 @@ struct ShiftView: View {
         let packed = run.isPacked(parcel.id)
         let selected = !packed && model.selectedID == parcel.id
         let shelved = run.location(of: parcel.id) == ParcelLocation.shelf
-        let quarters = rotation(for: parcel.id)
-        let cells = parcel.cells(rotation: quarters)
+        let cells = parcel.cells(rotation: 0)
         let e = cells.extent
         let slotPitch: CGFloat = min(14, 44 / CGFloat(max(e.cols, e.rows)))
         let traits: AccessibilityTraits = packed ? [] : (selected ? [.isButton, .isSelected] : .isButton)
@@ -360,7 +359,7 @@ struct ShiftView: View {
         .gesture(dragGesture(parcel.id), including: packed ? .subviews : .all)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(slotLabel(parcel, cols: e.cols, rows: e.rows))
-        .accessibilityValue(slotValue(packed: packed, selected: selected, shelved: shelved, quarters: quarters))
+        .accessibilityValue(slotValue(packed: packed, selected: selected, shelved: shelved))
         .accessibilityAddTraits(traits)
         .accessibilityHint(packed ? "Tap it in the box to take it out." : "Double tap to select, then choose a square in the box.")
         .accessibilityAction { if !packed { model.select(parcel.id) } }
@@ -422,12 +421,10 @@ struct ShiftView: View {
         return label
     }
 
-    private func slotValue(packed: Bool, selected: Bool, shelved: Bool, quarters: Int) -> String {
+    private func slotValue(packed: Bool, selected: Bool, shelved: Bool) -> String {
         if packed { return "Packed" }
-        var parts: [String] = []
-        if shelved { parts.append("On shelf") }
+        var parts: [String] = [shelved ? "On shelf" : "In tray"]
         if selected { parts.append("Selected") }
-        parts.append("rotated \(quarters * 90) degrees")
         return parts.joined(separator: ", ")
     }
 
@@ -438,8 +435,6 @@ struct ShiftView: View {
             HStack(spacing: 8) {
                 Button { model.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
                     .disabled(run.placements.isEmpty)
-                Button { model.rotateSelected() } label: { Label("Rotate", systemImage: "rotate.right") }
-                    .disabled(model.selectedParcel == nil)
                 Button { model.toggleShelfForSelected() } label: { shelfButtonLabel }
                     .disabled(!model.canShelveSelected)
             }
@@ -611,7 +606,7 @@ struct ShiftView: View {
         let e = cells.extent
         let inBounds = origin.x >= 0 && origin.y >= 0
             && origin.x + e.cols <= run.width && origin.y + e.rows <= run.height
-        let placement = Placement(parcelID: d.parcelID, origin: origin, rotation: rotation(for: d.parcelID))
+        let placement = Placement(parcelID: d.parcelID, origin: origin, rotation: 0)
         let valid = inBounds && run.canPlace(placement)
         return DropTarget(origin: origin, inBounds: inBounds, valid: valid)
     }
@@ -637,8 +632,7 @@ struct ShiftView: View {
 
     // MARK: Helpers
 
-    private func rotation(for id: Int) -> Int { model.rotations[id] ?? 0 }
-    private func shape(for id: Int) -> [Cell]? { run.parcel(id)?.cells(rotation: rotation(for: id)) }
+    private func shape(for id: Int) -> [Cell]? { run.parcel(id)?.cells(rotation: 0) }
 }
 
 // MARK: - Help
@@ -651,6 +645,7 @@ private struct ShiftHelpSheet: View {
             List {
                 Section("Shift rules") {
                     Label("Each box comes with more parcels than fit. There is always a way to fill it exactly.", systemImage: "shippingbox")
+                    Label("Place each parcel as shown; no turning.", systemImage: "square.grid.3x3")
                     Label("Seal to ship. Score the packed values \u{2014} a completely full box scores double.", systemImage: "checkmark.seal")
                     Label("The shelf keeps up to 3 parcels for later boxes in this shift. Tray parcels are sent back when you seal.", systemImage: "tray.and.arrow.down")
                     Label("Returning a rush parcel, or keeping it on the shelf through its due box, costs 5 points.", systemImage: "clock.badge.exclamationmark")

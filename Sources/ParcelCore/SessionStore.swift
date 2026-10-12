@@ -20,6 +20,7 @@ public struct SavedSession: Codable, Equatable, Sendable {
 
     public var isValid: Bool {
         version == 1 && state.isValid && shipped >= 0 && shipped < Int.max
+            && (!state.puzzle.isFixedOrientation || rotations.values.allSatisfy { $0 == 0 })
             && boxNumber > 0 && boxNumber < Int.max
             && rotations.count <= state.puzzle.parcels.count
             && rotations.allSatisfy { entry in

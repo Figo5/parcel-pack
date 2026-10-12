@@ -66,14 +66,17 @@ public struct Puzzle: Equatable, Codable, Sendable {
     public let size: BoxSize
     public let parcels: [Parcel]
     public let solution: [Placement]
+    public let fixedOrientations: Bool? // Missing in legacy saves that allowed turning.
+    public var isFixedOrientation: Bool { fixedOrientations == true }
     public var width: Int { size.width }
     public var height: Int { size.height }
 
-    public init(seed: UInt64, size: BoxSize, parcels: [Parcel], solution: [Placement]) {
+    public init(seed: UInt64, size: BoxSize, parcels: [Parcel], solution: [Placement], fixedOrientations: Bool = true) {
         self.seed = seed; self.size = size; self.parcels = parcels; self.solution = solution
+        self.fixedOrientations = fixedOrientations
     }
 
-    public static func generate(seed: UInt64, size: BoxSize) -> Puzzle {
+    public static func generate(seed: UInt64, size: BoxSize, fixedOrientations: Bool = true) -> Puzzle {
         var random = SeededRandom(state: seed)
         var path: [Cell] = []
         for y in 0..<size.height {
@@ -102,16 +105,16 @@ public struct Puzzle: Equatable, Codable, Sendable {
         for start in stride(from: 0, to: path.count, by: pieceArea) {
             let region = Array(path[start..<(start + pieceArea)])
             let origin = Cell(x: region.map(\.x).min()!, y: region.map(\.y).min()!)
-            let rotation = random.index(4)
+            let rotation = random.index(4) // Keep the legacy RNG order for saved-box migration.
             let id = parcels.count
-            parcels.append(Parcel(id: id, cells: turn(region, rotation: rotation), colorIndex: id))
-            solution.append(Placement(parcelID: id, origin: origin, rotation: (4 - rotation) % 4))
+            parcels.append(Parcel(id: id, cells: turn(region, rotation: fixedOrientations ? 0 : rotation), colorIndex: id))
+            solution.append(Placement(parcelID: id, origin: origin, rotation: fixedOrientations ? 0 : (4 - rotation) % 4))
         }
         for i in stride(from: parcels.count - 1, through: 1, by: -1) {
             let j = random.index(i + 1)
             parcels.swapAt(i, j)
         }
-        return Puzzle(seed: seed, size: size, parcels: parcels, solution: solution)
+        return Puzzle(seed: seed, size: size, parcels: parcels, solution: solution, fixedOrientations: fixedOrientations)
     }
 
     fileprivate var validDefinition: Bool {
@@ -143,7 +146,8 @@ public struct Puzzle: Equatable, Codable, Sendable {
     }
 
     fileprivate func footprint(_ placement: Placement) -> [Cell]? {
-        guard (0..<width).contains(placement.origin.x), (0..<height).contains(placement.origin.y),
+        guard !isFixedOrientation || placement.rotation == 0,
+              (0..<width).contains(placement.origin.x), (0..<height).contains(placement.origin.y),
               let parcel = parcels.first(where: { $0.id == placement.parcelID }),
               (1...5).contains(parcel.cells.count) else { return nil }
         let cells = parcel.cells(rotation: placement.rotation)
@@ -204,6 +208,24 @@ public struct PackingState: Equatable, Codable, Sendable {
     @discardableResult public mutating func undo() -> Bool { placements.popLast() != nil }
     public mutating func reset() { placements = [] }
 
+    /// Convert a legacy box to its reference orientations, retaining compatible packed footprints.
+    public func usingFixedOrientations() -> PackingState {
+        guard isValid, !puzzle.isFixedOrientation else { return self }
+        let reference = Dictionary(uniqueKeysWithValues: puzzle.solution.map { ($0.parcelID, $0.rotation) })
+        let parcels = puzzle.parcels.map {
+            Parcel(id: $0.id, cells: $0.cells(rotation: reference[$0.id] ?? 0), colorIndex: $0.colorIndex)
+        }
+        let solution = puzzle.solution.map { Placement(parcelID: $0.parcelID, origin: $0.origin, rotation: 0) }
+        let updated = Puzzle(seed: puzzle.seed, size: puzzle.size, parcels: parcels, solution: solution)
+        let retained = placements.compactMap { placement -> Placement? in
+            guard let before = puzzle.parcels.first(where: { $0.id == placement.parcelID }),
+                  let after = parcels.first(where: { $0.id == placement.parcelID }),
+                  before.cells(rotation: placement.rotation) == after.cells else { return nil }
+            return Placement(parcelID: placement.parcelID, origin: placement.origin, rotation: 0)
+        }
+        return PackingState(puzzle: updated, placements: retained)
+    }
+
     public func hint() -> Placement? {
         guard isValid, !isComplete, let occupied = puzzle.occupancy(placements) else { return nil }
         let usedIDs = Set(placements.map(\.parcelID))
@@ -213,7 +235,7 @@ public struct PackingState: Equatable, Codable, Sendable {
         var optionsByCell = Array(repeating: [Option](), count: puzzle.width * puzzle.height)
         for (index, parcel) in remaining.enumerated() {
             var seenShapes = Set<[Cell]>()
-            for rotation in 0..<4 {
+            for rotation in 0..<(puzzle.isFixedOrientation ? 1 : 4) {
                 let cells = parcel.cells(rotation: rotation)
                 guard seenShapes.insert(cells).inserted else { continue }
                 let maxX = cells.map(\.x).max()!, maxY = cells.map(\.y).max()!

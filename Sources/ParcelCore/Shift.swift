@@ -61,6 +61,8 @@ public struct ShiftPlan: Equatable, Codable, Sendable {
     public let number: Int                // 1-based shift number
     public let boxes: [ShiftBox]
     public let target: Int
+    public let fixedOrientations: Bool? // Missing in legacy saves that allowed turning.
+    public var isFixedOrientation: Bool { fixedOrientations == true }
 
     public var reference: Int {
         var total = 0
@@ -74,7 +76,7 @@ public struct ShiftPlan: Equatable, Codable, Sendable {
         return min(130, 120 + 5 * (shift - 5))
     }
 
-    public static func generate(seed: UInt64, number: Int) -> ShiftPlan {
+    public static func generate(seed: UInt64, number: Int, fixedOrientations: Bool = true) -> ShiftPlan {
         let shift = max(number, 1)
         let sizes: [BoxSize] = shift == 1 ? [.small, .medium, .medium, .large, .large] : [.medium, .large, .medium, .large, .large]
         let extrasCount = shift == 1 ? 2 : 3
@@ -84,18 +86,18 @@ public struct ShiftPlan: Equatable, Codable, Sendable {
         var referenceTotal = 0
         for boxIndex in 0..<boxesPerShift {
             let box = makeBox(size: sizes[boxIndex], boxIndex: boxIndex, number: shift,
-                              extrasCount: extrasCount, rushChance: rushChance, rng: &rng)
+                              extrasCount: extrasCount, rushChance: rushChance, fixedOrientations: fixedOrientations, rng: &rng)
             referenceTotal += 2 * box.coreValue
             boxes.append(box)
         }
         let target = (referenceTotal * targetPercent(for: shift) + 99) / 100
-        return ShiftPlan(seed: seed, number: shift, boxes: boxes, target: target)
+        return ShiftPlan(seed: seed, number: shift, boxes: boxes, target: target, fixedOrientations: fixedOrientations)
     }
 
     // RNG order per box: partition, core values, core rotations, extras (size, shape, value, rotation),
     // rush, then Fisher-Yates shuffle of the assembled list.
     private static func makeBox(size: BoxSize, boxIndex: Int, number: Int, extrasCount: Int,
-                                rushChance: Int, rng: inout SeededRandom) -> ShiftBox {
+                                rushChance: Int, fixedOrientations: Bool, rng: inout SeededRandom) -> ShiftBox {
         let regions = partition(width: size.width, height: size.height, rng: &rng)
         let base = boxIndex * 32
 
@@ -108,10 +110,10 @@ public struct ShiftPlan: Equatable, Codable, Sendable {
             values.append(coreBaseValues[min(region.count, 5)] + bonus)
         }
         for (position, region) in regions.enumerated() {
-            let rotation = rng.index(4)
-            shapes.append(turn(region, rotation: rotation))
+            let rotation = rng.index(4) // Keep the legacy RNG order so IDs, values, and rush deadlines match.
+            shapes.append(turn(region, rotation: fixedOrientations ? 0 : rotation))
             let origin = Cell(x: region.map(\.x).min() ?? 0, y: region.map(\.y).min() ?? 0)
-            coreSolution.append(Placement(parcelID: base + position, origin: origin, rotation: (4 - rotation) % 4))
+            coreSolution.append(Placement(parcelID: base + position, origin: origin, rotation: fixedOrientations ? 0 : (4 - rotation) % 4))
         }
 
         for _ in 0..<extrasCount {
@@ -266,7 +268,7 @@ public struct FullBoxSolution: Equatable, Sendable {
 public enum ShiftSolver: Sendable {
     /// Highest parcel value among exact fills; a capped search returns a valid lower bound.
     public static func bestFullBox(width: Int, height: Int, parcels: [ShiftParcel],
-                                   mustInclude: Set<Int> = []) -> FullBoxSolution? {
+                                   mustInclude: Set<Int> = [], allowRotation: Bool = false) -> FullBoxSolution? {
         guard (1...25).contains(width), (1...25).contains(height), width * height <= 25,
               parcels.count <= 20, Set(parcels.map(\.id)).count == parcels.count,
               mustInclude.isSubset(of: Set(parcels.map(\.id))),
@@ -281,7 +283,7 @@ public enum ShiftSolver: Sendable {
         for (index, parcel) in parcels.enumerated() {
             if mustInclude.contains(parcel.id) { mustMask |= 1 << index }
             var shapes = Set<[Cell]>()
-            for rotation in 0..<4 {
+            for rotation in 0..<(allowRotation ? 4 : 1) {
                 let shape = turn(parcel.cells, rotation: rotation)
                 guard !shape.isEmpty, shapes.insert(shape).inserted else { continue }
                 let shapeWidth = (shape.map(\.x).max() ?? 0) + 1
@@ -452,9 +454,9 @@ public struct ShiftRun: Equatable, Codable, Sendable {
     public private(set) var shiftsCleared: Int
     public private(set) var results: [BoxResult]     // this shift's sealed boxes
 
-    public init(runSeed: UInt64, startingShift: Int = 1) {
+    public init(runSeed: UInt64, startingShift: Int = 1, fixedOrientations: Bool = true) {
         let number = max(startingShift, 1)
-        let firstPlan = ShiftPlan.generate(seed: ShiftRun.planSeed(runSeed: runSeed, number: number), number: number)
+        let firstPlan = ShiftPlan.generate(seed: ShiftRun.planSeed(runSeed: runSeed, number: number), number: number, fixedOrientations: fixedOrientations)
         self.runSeed = runSeed
         self.plan = firstPlan
         self.boxIndex = 0
@@ -523,7 +525,8 @@ public struct ShiftRun: Equatable, Codable, Sendable {
 
     // Board footprint of a placement, or [] if the rotation, parcel or position is invalid.
     public func cells(for placement: Placement) -> [Cell] {
-        guard (0..<4).contains(placement.rotation), let found = parcel(placement.parcelID) else { return [] }
+        guard (!plan.isFixedOrientation || placement.rotation == 0),
+              (0..<4).contains(placement.rotation), let found = parcel(placement.parcelID) else { return [] }
         let boardWidth = width
         let boardHeight = height
         guard (0..<boardWidth).contains(placement.origin.x), (0..<boardHeight).contains(placement.origin.y) else { return [] }
@@ -611,7 +614,7 @@ public struct ShiftRun: Equatable, Codable, Sendable {
         }
         let lateFees = ShiftRun.lateFee * lateCount
         // Late shelf parcels were still packable this box, so they count toward the best fill.
-        let solution = ShiftSolver.bestFullBox(width: width, height: height, parcels: parcels, mustInclude: [])
+        let solution = ShiftSolver.bestFullBox(width: width, height: height, parcels: parcels, mustInclude: [], allowRotation: !plan.isFixedOrientation)
         let bestFull: Int? = solution.flatMap { $0.exhaustive ? $0.value * 2 : nil }
         shelfIDs.removeAll(where: { lateShelfIDs.contains($0) })
         parcels.removeAll(where: { lateShelfIDs.contains($0.id) })
@@ -640,6 +643,25 @@ public struct ShiftRun: Equatable, Codable, Sendable {
         parcels = carried + plan.boxes[boxIndex].parcels
         placements = []
         phase = .packing
+        useFixedOrientations()
+        return true
+    }
+
+    /// Upgrade a packing box while leaving shipped snapshots and earned scores untouched.
+    @discardableResult public mutating func useFixedOrientations() -> Bool {
+        guard phase == .packing, !plan.isFixedOrientation, isValid else { return false }
+        let generated = ShiftPlan.generate(seed: plan.seed, number: plan.number)
+        let updated = ShiftPlan(seed: plan.seed, number: plan.number, boxes: generated.boxes,
+                                target: plan.target, fixedOrientations: true)
+        let definitions = Dictionary(uniqueKeysWithValues: updated.boxes.flatMap(\.parcels).map { ($0.id, $0) })
+        let retained = placements.compactMap { placement -> Placement? in
+            guard let before = parcel(placement.parcelID), let after = definitions[placement.parcelID],
+                  before.cells(rotation: placement.rotation) == after.cells else { return nil }
+            return Placement(parcelID: placement.parcelID, origin: placement.origin, rotation: 0)
+        }
+        parcels = parcels.compactMap { definitions[$0.id] }
+        plan = updated
+        placements = retained
         return true
     }
 
@@ -662,7 +684,7 @@ public struct ShiftRun: Equatable, Codable, Sendable {
     public var isValid: Bool {
         guard plan.number >= 1, plan.number < Int.max - 1,
               plan.seed == Self.planSeed(runSeed: runSeed, number: plan.number) else { return false }
-        let regenerated = ShiftPlan.generate(seed: plan.seed, number: plan.number)
+        let regenerated = ShiftPlan.generate(seed: plan.seed, number: plan.number, fixedOrientations: plan.isFixedOrientation)
         guard regenerated.number == plan.number, regenerated.seed == plan.seed, regenerated.boxes == plan.boxes,
               plan.target > 0, plan.target <= regenerated.reference * 2,
               (0..<ShiftPlan.boxesPerShift).contains(boxIndex) else { return false }

@@ -9,16 +9,10 @@ import ParcelCore
         return (name, UserDefaults(suiteName: name)!)
     }
 
-    /// Selects the parcel, turns it to the placement's rotation, and places it at its origin.
+    /// Places each parcel in the orientation shown in its tray.
     @discardableResult
     private func pack(_ model: ShiftModel, _ placement: Placement) -> Bool {
         model.select(placement.parcelID)
-        let target = ((placement.rotation % 4) + 4) % 4
-        var turns = 0
-        while model.selectedRotation != target && turns < 4 {
-            model.rotateSelected()
-            turns += 1
-        }
         return model.placeSelected(x: placement.origin.x, y: placement.origin.y)
     }
 

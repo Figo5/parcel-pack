@@ -2,13 +2,13 @@
 
 The checkout is `/Users/giofiore/parcel-pack`, backed up in the private GitHub repository `Figo5/parcel-pack`. The active development branch is `claude/optimistic-johnson-nmx2si`, with scored Shift runs and the original Free pack. Main still contains the original game.
 
-As of October 12, Xcode 27.0 is installed, its license/setup is complete, all 33 Swift tests pass, and the iOS Simulator binary compiles. The remaining Xcode platform download must finish before simulator play. No physical phone build has been installed.
+As of October 12, Xcode 27.0 is installed, its license/setup is complete, all 41 Swift tests pass, and the iOS Simulator binary compiles and runs on an iPhone 18 Pro with iOS 27.0. The simulator runtime download is complete. No physical phone build has been installed.
 
 ## Simulator
 
-1. Let Xcode finish downloading its iOS simulator runtime.
+1. Open Xcode’s Device Hub (Xcode → Open Developer Tool → Device Hub) to see the installed iPhone simulator build.
 2. Open `ParcelPack.xcodeproj`, select the **ParcelPack** scheme, and choose an available iPhone simulator as the run destination.
-3. Press **⌘R**. Check drag and tap placement, rotation, undo, shelf carryover, rush deadlines, sealing, the five-box outcome, mode switching, and progress after relaunch.
+3. Press **⌘R**. Check drag and tap placement using the shown shapes, undo, shelf carryover, rush deadlines, sealing, the five-box outcome, mode switching, and progress after relaunch.
 
 Use `xcrun simctl list runtimes` to confirm that a runtime is installed. The generic simulator build does not require a booted device:
 
@@ -35,6 +35,6 @@ zsh scripts/build-mac.sh
 open "dist/Parcel Pack.app"
 ```
 
-Both modes save locally and separately. In-progress Shift quotas survive balance updates. There are no external package dependencies. Build products and local orchestration logs are ignored.
+Both modes use fixed shapes with no rotation and save locally and separately. Older packing boards retain compatible placements and unpack incompatible pieces during migration; earned counts and scores are preserved. In-progress Shift quotas survive balance updates. There are no external package dependencies. Build products and local orchestration logs are ignored.
 
 See [README.md](README.md), [DESIGN.md](DESIGN.md), and [VALIDATION.md](VALIDATION.md) for rules, architecture, and the completed checks.
