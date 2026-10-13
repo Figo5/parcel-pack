@@ -16,8 +16,8 @@ cat > "$app_bundle/Contents/Info.plist" <<'PLIST'
 <key>CFBundleName</key><string>Parcel Pack</string>
 <key>CFBundleDisplayName</key><string>Parcel Pack</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.2</string>
-<key>CFBundleVersion</key><string>3</string>
+<key>CFBundleShortVersionString</key><string>1.3</string>
+<key>CFBundleVersion</key><string>4</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>

@@ -27,7 +27,8 @@ import AudioToolbox
         self.now = now
         store = TycoonStore(defaults: defaults)
         let restored = store.load()
-        let initial = restored?.account ?? TycoonAccount(seed: UInt64.random(in: .min ... .max))
+        var initial = restored?.account ?? TycoonAccount(seed: UInt64.random(in: .min ... .max))
+        let waiting = initial.settlePendingStaff()
         let customer = initial.lastDelivery?.order.customer ?? .cornerMarket
         let initialSession = restored?.session ?? TycoonSession(order: .generate(accountSeed: initial.seed,
             sequence: initial.completedOrders + 1, choice: 0, customer: customer))
@@ -41,6 +42,7 @@ import AudioToolbox
         } else {
             message = "Pack your first order. Every delivery grows your depot."
         }
+        if waiting.earned > 0 { staffMessage = "Waiting orders shipped · +$\(waiting.earned) earned." }
         refreshStaff()
         save()
     }
@@ -191,7 +193,7 @@ import AudioToolbox
         var updated = account
         guard let cost = updated.managerCost(for: customer), updated.hireManager(for: customer),
               commit(account: updated, session: session) else { return }
-        staffMessage = "\(customer.title) is managed. Packed orders now ship automatically."
+        staffMessage = "\(customer.title) manager hired · packing speed and earnings boosted by 25%."
         message = "Manager hired · $\(cost) invested."
         feedback(complete: true)
     }
@@ -219,9 +221,9 @@ import AudioToolbox
         // Timestamp and proceeds share one snapshot, so relaunch cannot replay elapsed work.
         guard commit(account: updated, session: session, timestamp: moment) else { return }
         if report.earned > 0 {
-            staffMessage = "Your managers shipped orders · +$\(report.earned) earned."
+            staffMessage = "Your crew shipped orders · +$\(report.earned) earned."
         } else if report.packedOrders > 0 {
-            staffMessage = "Your workers packed \(report.packedOrders) orders. Collect them in Crew."
+            staffMessage = "Your workers shipped \(report.packedOrders) orders."
         }
     }
 

@@ -190,4 +190,33 @@ import ParcelCore
         restored.refreshStaff()
         #expect(restored.account.automatedOrders == 3)
     }
+
+    @Test func waitingLegacyOrdersAreBankedOnLaunchWithoutAnElapsedTick() throws {
+        let (name, prefs) = defaults()
+        defer { prefs.removePersistentDomain(forName: name) }
+        var business = TycoonAccount(seed: 164)
+        for _ in 0..<12 {
+            var box = TycoonSession(order: business.offers[0])
+            for placement in box.state.puzzle.solution { _ = box.state.place(placement) }
+            _ = business.ship(box)
+        }
+        let hired = business.hireWorker(for: .cornerMarket)
+        #expect(hired)
+        let oldPay = business.workerPayout(for: .cornerMarket)
+        business.teams[.cornerMarket]?.pendingOrders = 2
+        business.teams[.cornerMarket]?.pendingCash = 2 * oldPay
+        let cash = business.cash
+        let receipt = business.lastDelivery
+        let active = TycoonSession(order: business.offers[0])
+        let time = Date(timeIntervalSince1970: 1_800_000_000)
+        #expect(TycoonStore(defaults: prefs).save(SavedTycoon(account: business, session: active, staffUpdatedAt: time)))
+        let model = TycoonModel(defaults: prefs, now: { time })
+        #expect(model.account.cash == cash + 2 * oldPay)
+        #expect(model.account.automatedOrders == 2)
+        #expect(model.account.teams[.cornerMarket]?.pendingOrders == 0)
+        #expect(model.account.lastDelivery == receipt)
+        #expect(model.session == active)
+        let restored = TycoonModel(defaults: prefs, now: { time })
+        #expect(restored.account == model.account)
+    }
 }

@@ -2,9 +2,9 @@
 
 Checkout: `/Users/giofiore/parcel-pack`. Private GitHub repository: `Figo5/parcel-pack`. Development branch: `claude/optimistic-johnson-nmx2si`. Main remains unchanged.
 
-As of October 13, version **1.2, build 3** is installed and launched on the user's iPhone 15 running iOS 26.7.1. Xcode 27.0 setup, Apple Account sign-in, Developer Mode, Keychain authorization, and developer trust are complete. The phone can be unplugged for normal play.
+As of October 13, version **1.3, build 4** is installed and launched on the user's iPhone 15 running iOS 26.7.1. A filtered device app listing confirms both version numbers. Xcode 27.0 setup, Apple Account sign-in, Developer Mode, Keychain authorization, and developer trust are complete. The phone can be unplugged for normal play.
 
-The game has **Tycoon** and endless **Free play**. Tycoon keeps the chosen store between orders, has six 30-level equipment lines and six worker/manager teams, and credits up to eight hours of closed-app production. Shift is removed from navigation. Old business values migrate; historical Shift/Free pack save keys remain untouched.
+The game has **Tycoon** and endless **Free play**. Version 1.3 makes every hired worker team ship earnings automatically, including up to eight hours offline; managers now boost packing speed and pay by 25%. Older waiting orders are credited once on launch. The depot has a richer shipping-floor illustration and live automatic-income summary. Tycoon retains the chosen customer and six 30-level equipment lines. Shift remains removed; historical Shift/Free pack save keys are untouched.
 
 ## Development
 
@@ -14,7 +14,7 @@ zsh scripts/build-mac.sh
 open "dist/Parcel Pack.app"
 ```
 
-All 95 tests pass. Native Mac, simulator, and signed device builds succeed. Open Xcode's Device Hub to view the iPhone 18 Pro simulator.
+All 99 tests pass. Native Mac, simulator, and signed device builds succeed. Open Xcode's Device Hub to view the iPhone 18 Pro simulator.
 
 ```sh
 xcodebuild -project ParcelPack.xcodeproj -scheme ParcelPack \

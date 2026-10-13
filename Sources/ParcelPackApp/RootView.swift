@@ -55,9 +55,10 @@ struct RootView: View {
             }
             if PlayMode(rawValue: modeRaw) == nil { modeRaw = PlayMode.tycoon.rawValue }
         }
-        .task {
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
             while !Task.isCancelled {
-                if scenePhase == .active { tycoon.refreshStaff() }
+                tycoon.refreshStaff()
                 do { try await Task.sleep(for: .seconds(1)) } catch { break }
             }
         }

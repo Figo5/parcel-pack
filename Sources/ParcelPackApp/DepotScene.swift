@@ -3,288 +3,448 @@ import SwiftUI
 import ParcelCore
 #endif
 
-/// The depot is drawn from the player's actual building and equipment levels.
+/// A cutaway shipping floor. Owned equipment and hired teams determine its contents.
 struct DepotScene: View {
     let account: TycoonAccount
 
     private var stage: Int { account.stage.rawValue }
+    private var roomWidth: CGFloat { CGFloat(8 + min(stage, 2)) }
+    private var roomDepth: CGFloat { stage >= 2 ? 8 : 7 }
     private var workers: Int { account.teams.values.reduce(0) { $0 + $1.workers } }
     private var managers: Int { account.teams.values.filter(\.hasManager).count }
+    private var originX: CGFloat { 180 - (roomWidth - roomDepth) * 8.5 }
+    private var canvasHeight: CGFloat { account.level(.van) > 0 ? 286 : stage >= 2 ? 260 : 242 }
 
     var body: some View {
         Canvas { context, size in
-            let scale = min(size.width / 360, size.height / 224)
-            context.translateBy(x: (size.width - 360 * scale) / 2, y: (size.height - 224 * scale) / 2)
+            let scale = min(size.width / 360, size.height / canvasHeight)
+            context.translateBy(x: (size.width - 360 * scale) / 2, y: (size.height - canvasHeight * scale) / 2)
             context.scaleBy(x: scale, y: scale)
-            drawDepot(in: &context)
+            drawRoom(in: &context)
         }
-        .aspectRatio(360.0 / 224.0, contentMode: .fit)
+        .aspectRatio(360.0 / canvasHeight, contentMode: .fit)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Your \(account.stage.title), \(workers) workers and \(managers) managers. Workbench level \(account.level(.workbench)), shelves level \(account.level(.shelves)), delivery van level \(account.level(.van)), label printer level \(account.level(.labels)), conveyor level \(account.level(.conveyor)), dispatch desk level \(account.level(.dispatchDesk)).")
+        .accessibilityLabel("Your \(account.stage.title), \(workers) \(workers == 1 ? "worker" : "workers") and \(managers) \(managers == 1 ? "manager" : "managers"). Workbench level \(account.level(.workbench)), shelves level \(account.level(.shelves)), van level \(account.level(.van)), label printer level \(account.level(.labels)), conveyor level \(account.level(.conveyor)), dispatch desk level \(account.level(.dispatchDesk)).")
     }
 
-    private func drawDepot(in context: inout GraphicsContext) {
-        let left = CGPoint(x: 24, y: 126)
-        let back = CGPoint(x: 176, y: 66)
-        let right = CGPoint(x: 338, y: 125)
-        let front = CGPoint(x: 185, y: 189)
-        polygon([CGPoint(x: 30, y: 144), CGPoint(x: 183, y: 205), CGPoint(x: 344, y: 140), CGPoint(x: 187, y: 81)],
-                color: Palette.ink.opacity(0.07), in: &context)
-        polygon([CGPoint(x: 24, y: 76), CGPoint(x: 176, y: 16), back, left],
-                color: stage < 2 ? Color(hex: 0xE9DCC8) : Color(hex: 0xD6E0D6), in: &context)
-        polygon([CGPoint(x: 176, y: 16), CGPoint(x: 338, y: 75), right, back],
-                color: stage < 2 ? Color(hex: 0xF0E5D3) : Color(hex: 0xE8EEE4), in: &context)
-        polygon([left, back, right, front], color: Color(hex: stage < 2 ? 0xD3BD98 : 0xC4C8B4), in: &context)
-        polygon([left, front, CGPoint(x: 185, y: 197), CGPoint(x: 24, y: 134)], color: Color(hex: 0xB29C7D), in: &context)
-        polygon([front, right, CGPoint(x: 338, y: 133), CGPoint(x: 185, y: 197)], color: Color(hex: 0x9FAD99), in: &context)
+    private func point(_ u: CGFloat, _ v: CGFloat, _ z: CGFloat = 0) -> CGPoint {
+        CGPoint(x: originX + (u - v) * 17, y: 91 + (u + v) * 8 - z * 17)
+    }
 
-        // Floor joints follow the room's two axes.
-        for step in 1..<6 {
-            let fraction = CGFloat(step) / 6
-            line(from: interpolate(left, back, fraction), to: interpolate(front, right, fraction),
-                 color: Palette.ink.opacity(0.08), width: 1, in: &context)
-            line(from: interpolate(left, front, fraction), to: interpolate(back, right, fraction),
-                 color: Palette.ink.opacity(0.08), width: 1, in: &context)
+    private func drawRoom(in context: inout GraphicsContext) {
+        let width = roomWidth, depth = roomDepth
+        let wallHeight: CGFloat = stage >= 3 ? 4.5 : 4
+        let floor = [point(0, 0), point(width, 0), point(width, depth), point(0, depth)]
+        let shadow = floor.map { CGPoint(x: $0.x + 4, y: $0.y + 13) }
+        polygon(shadow, color: Palette.ink.opacity(0.06), in: &context)
+        polygon(floor.map { CGPoint(x: $0.x + 2, y: $0.y + 7) }, color: Palette.ink.opacity(0.08), in: &context)
+
+        let leftWall = [point(0, 0, wallHeight), point(0, depth, wallHeight), point(0, depth), point(0, 0)]
+        let rightWall = [point(0, 0, wallHeight), point(width, 0, wallHeight), point(width, 0), point(0, 0)]
+        gradient(leftWall, colors: [Color(hex: 0xECE2CE), Color(hex: stage >= 2 ? 0xCFD9CD : 0xDDCFB5)],
+                 from: point(0, 0, wallHeight), to: point(0, depth), in: &context)
+        gradient(rightWall, colors: [Palette.surface, Color(hex: stage >= 2 ? 0xE3E9DD : 0xEAE0CB)],
+                 from: point(0, 0, wallHeight), to: point(width, 0), in: &context)
+        polygon(floor, color: Color(hex: stage >= 2 ? 0xC9CCB8 : 0xD9C6A7), in: &context)
+        polygon([point(0, depth), point(width, depth), point(width, depth, -0.4), point(0, depth, -0.4)],
+                color: Color(hex: 0xAD9A7B), in: &context)
+        polygon([point(width, 0), point(width, depth), point(width, depth, -0.4), point(width, 0, -0.4)],
+                color: Color(hex: 0xB6BDA6), in: &context)
+
+        // Seams, skirting and sunlight give the little room its materials and depth.
+        for u in stride(from: CGFloat(1), to: width, by: 1) {
+            line(point(u, 0), point(u, depth), color: Palette.ink.opacity(0.08), width: 0.8, in: &context)
         }
+        for v in stride(from: CGFloat(1), to: depth, by: 1) {
+            line(point(0, v), point(width, v), color: Palette.ink.opacity(0.07), width: 0.8, in: &context)
+        }
+        line(point(0, 0, 0.12), point(0, depth, 0.12), color: Color(hex: 0xB2B79C), width: 3, in: &context)
+        line(point(0, 0, 0.12), point(width, 0, 0.12), color: Color(hex: 0xB2B79C), width: 3, in: &context)
+        line(point(0, 0, wallHeight), point(0, depth, wallHeight), color: Palette.surface, width: 3, in: &context)
+        line(point(0, 0, wallHeight), point(width, 0, wallHeight), color: Palette.surface, width: 3, in: &context)
+        polygon([point(3.4, 0.2), point(5.8, 0.2), point(7.3, 4.4), point(3.7, 5.1)],
+                color: Palette.surface.opacity(0.19), in: &context)
 
-        if stage == 0 {
-            // A sunny spare room, before the business has a loading bay.
-            polygon([CGPoint(x: 235, y: 53), CGPoint(x: 275, y: 67), CGPoint(x: 275, y: 96), CGPoint(x: 235, y: 82)],
-                    color: Color(hex: 0x9DCBC6), in: &context)
-            line(from: CGPoint(x: 255, y: 60), to: CGPoint(x: 255, y: 89), color: Palette.surface, width: 3, in: &context)
-            line(from: CGPoint(x: 235, y: 67), to: CGPoint(x: 275, y: 81), color: Palette.surface, width: 3, in: &context)
-            plant(at: CGPoint(x: 300, y: 123), in: &context)
-        } else {
-            loadingBay(at: CGPoint(x: 254, y: 66), large: stage >= 3, in: &context)
-            if stage >= 2 {
-                polygon([CGPoint(x: 255, y: 124), CGPoint(x: 292, y: 137), CGPoint(x: 262, y: 150), CGPoint(x: 225, y: 136)],
-                        color: Color(hex: 0xE0B952), in: &context)
-                for index in 0..<4 {
-                    let x = CGFloat(index) * 8
-                    line(from: CGPoint(x: 232 + x, y: 134 + x * 0.35), to: CGPoint(x: 240 + x, y: 130 + x * 0.35),
-                         color: Palette.ink.opacity(0.35), width: 3, in: &context)
-                }
+        wallSign("PARCEL PACK", center: point(0, 3.4, 3.25), angle: -25, width: 91, in: &context)
+        window(in: &context)
+        noticeboard(in: &context)
+        if stage >= 2 {
+            for v in [CGFloat(0.15), depth - 0.15] {
+                line(point(0, v, 0.1), point(0, v, wallHeight), color: Color(hex: 0x8EA592), width: 4, in: &context)
             }
+            line(point(width - 0.15, 0, 0.1), point(width - 0.15, 0, wallHeight),
+                 color: Color(hex: 0x8EA592), width: 4, in: &context)
+        }
+        if stage >= 3 {
+            ceilingLight(at: point(3.2, 0.5, wallHeight - 0.3), in: &context)
+            ceilingLight(at: point(7.5, 0.5, wallHeight - 0.3), in: &context)
         }
 
-        let rackCount = min(4, 1 + stage / 2 + account.level(.shelves) / 4)
-        for rack in (0..<rackCount).reversed() {
-            shelf(at: CGPoint(x: 42 + CGFloat(rack) * 30, y: 113 - CGFloat(rack) * 12),
-                  stocked: min(6, 2 + account.level(.shelves)), in: &context)
+        loadingDoor(in: &context)
+        floorZone(u: width - 2.75, v: 0.55, width: 2.3, depth: 2.0,
+                  color: Color(hex: 0xE5C574), in: &context)
+
+        let rackCount = min(3, 1 + stage / 3 + account.level(.shelves) / 12)
+        for index in 0..<rackCount {
+            rack(u: 0.38, v: 0.4 + CGFloat(index) * 2.15,
+                 upgraded: account.level(.shelves) > 0,
+                 stock: min(9, 4 + stage + account.level(.shelves) / 5), in: &context)
+        }
+        floorZone(u: 2.55, v: 2.75, width: 3.8, depth: 2.8,
+                  color: Palette.accent.opacity(0.13), in: &context)
+        packingBench(u: 3.0, v: 3.0, level: account.level(.workbench), withPrinter: account.level(.labels) > 0, in: &context)
+        if account.level(.workbench) >= 10 && stage >= 1 {
+            packingBench(u: 5.6, v: 5.0, level: account.level(.workbench), withPrinter: false, in: &context)
+        }
+        if account.level(.dispatchDesk) > 0 {
+            dispatchDesk(u: width - 3.8, v: 1.35, in: &context)
         }
 
-        let deskCount = min(3, 1 + account.level(.workbench) / 4)
-        for index in 0..<deskCount {
-            workbench(at: CGPoint(x: 130 + CGFloat(index) * 50, y: 133 + CGFloat(index) * 17),
-                      upgraded: account.level(.workbench) > 0, in: &context)
+        // Cardboard shipping crates belong to every room; machinery only appears when bought.
+        pallet(u: 1.65, v: depth - 1.35, in: &context)
+        let storageCrates = min(6, 3 + stage + account.level(.shelves) / 10)
+        for index in 0..<storageCrates {
+            let u = 1.75 + CGFloat(index % 2) * 0.62
+            let v = depth - 1.25 + CGFloat((index / 2) % 2) * 0.55
+            let z: CGFloat = index >= 4 ? 0.7 : 0.13
+            parcel(u: u, v: v, z: z, width: 0.55, depth: 0.5, height: 0.57,
+                   color: Color(hex: index % 2 == 0 ? 0xDAB483 : 0xE4C79F), in: &context)
         }
-        if account.level(.labels) > 0 {
-            labelPrinter(at: CGPoint(x: 143, y: 119), in: &context)
+        pallet(u: width - 2.45, v: 1.0, in: &context)
+        parcel(u: width - 2.3, v: 1.15, z: 0.13, width: 0.85, depth: 0.6, height: 0.7,
+               color: Palette.cardboard, in: &context)
+        parcel(u: width - 1.6, v: 1.6, z: 0.13, width: 0.62, depth: 0.65, height: 0.85,
+               color: Color(hex: 0xD1AD7C), in: &context)
+        if stage >= 2 {
+            parcel(u: width - 2.1, v: 1.25, z: 0.85, width: 0.55, depth: 0.55, height: 0.5,
+                   color: Palette.parcel(2), in: &context)
         }
-        if account.level(.dispatchDesk) > 0 || managers > 0 {
-            dispatchDesk(at: CGPoint(x: 227, y: 118), in: &context)
+        handCart(u: width - 0.8, v: 3.05, in: &context)
+        plant(at: point(0.7, depth - 0.3), in: &context)
+
+        if account.level(.conveyor) > 0 {
+            conveyor(u: 3.1, v: depth - 1.0, level: account.level(.conveyor), in: &context)
         }
-        for index in 0..<min(6, 1 + stage + account.level(.shelves) / 4) {
-            box(at: CGPoint(x: 214 + CGFloat(index % 3) * 17, y: 163 + CGFloat(index % 3) * 6 - CGFloat(index / 3) * 17),
-                width: 17, height: 14, color: Palette.cardboard, in: &context)
-        }
+        drawStaff(in: &context)
 
         if account.level(.van) > 0 {
-            van(at: CGPoint(x: 274, y: 174), upgraded: account.level(.van) >= 5, in: &context)
+            van(at: CGPoint(x: 264, y: 254), level: account.level(.van), in: &context)
         } else {
-            box(at: CGPoint(x: 283, y: 173), width: 20, height: 18, color: Color(hex: 0xD4AF78), in: &context)
-            box(at: CGPoint(x: 307, y: 183), width: 16, height: 13, color: Palette.cardboard, in: &context)
-        }
-
-        if stage >= 3 {
-            polygon([CGPoint(x: 168, y: 32), CGPoint(x: 178, y: 28), CGPoint(x: 331, y: 84), CGPoint(x: 321, y: 88)],
-                    color: Palette.accent, in: &context)
-            line(from: CGPoint(x: 324, y: 87), to: CGPoint(x: 324, y: 127), color: Palette.accent, width: 5, in: &context)
-        }
-        if stage == 4 {
-            shelf(at: CGPoint(x: 290, y: 122), stocked: 6, in: &context)
-            polygon([CGPoint(x: 165, y: 55), CGPoint(x: 194, y: 65), CGPoint(x: 194, y: 85), CGPoint(x: 165, y: 75)],
-                    color: Palette.surface, in: &context)
-            context.draw(Text("HUB").font(.system(size: 10, weight: .black, design: .rounded)).foregroundStyle(Palette.accent),
-                         at: CGPoint(x: 179, y: 71))
-        }
-        if account.level(.conveyor) > 0 {
-            conveyor(at: CGPoint(x: 103, y: 149), level: account.level(.conveyor), in: &context)
-        }
-        let positions = [CGPoint(x: 116, y: 147), CGPoint(x: 171, y: 165), CGPoint(x: 214, y: 175),
-                         CGPoint(x: 83, y: 125), CGPoint(x: 160, y: 121), CGPoint(x: 256, y: 147)]
-        let visibleWorkers = min(positions.count, workers)
-        if visibleWorkers > 0 {
-            for index in 0..<visibleWorkers {
-                person(at: positions[index], shirt: Palette.parcel(index + 2), manager: false, in: &context)
-            }
-        }
-        for index in 0..<min(3, managers) {
-            person(at: CGPoint(x: 242 + CGFloat(index) * 15, y: 130 + CGFloat(index) * 6),
-                   shirt: Palette.accent, manager: true, in: &context)
+            // A paper shipment label on the room's exposed front edge.
+            var label = context
+            label.translateBy(x: point(4.0, depth, -0.22).x, y: point(4.0, depth, -0.22).y)
+            label.rotate(by: .degrees(25))
+            label.draw(Text("READY TO GO").font(.system(size: 7, weight: .heavy, design: .rounded))
+                .foregroundStyle(Palette.surface), at: .zero)
         }
     }
 
-    private func labelPrinter(at origin: CGPoint, in context: inout GraphicsContext) {
-        context.fill(Path(roundedRect: CGRect(x: origin.x - 6, y: origin.y - 8, width: 15, height: 10), cornerRadius: 2),
-                     with: .color(Palette.ink))
-        context.fill(Path(roundedRect: CGRect(x: origin.x - 3, y: origin.y - 13, width: 9, height: 8), cornerRadius: 1),
+    private func window(in context: inout GraphicsContext) {
+        let u: CGFloat = 2.0, width: CGFloat = 1.55, low: CGFloat = 1.9, high: CGFloat = 3.2
+        let points = [point(u, 0, high), point(u + width, 0, high), point(u + width, 0, low), point(u, 0, low)]
+        polygon(points, color: Color(hex: 0x9EC5BE), in: &context)
+        context.stroke(path(points), with: .color(Palette.surface), lineWidth: 3)
+        line(point(u + width / 2, 0, high), point(u + width / 2, 0, low), color: Palette.surface, width: 2, in: &context)
+        line(point(u, 0, (low + high) / 2), point(u + width, 0, (low + high) / 2), color: Palette.surface, width: 2, in: &context)
+        line(point(u - 0.1, 0.08, low), point(u + width + 0.1, 0.08, low), color: Palette.cardboard, width: 4, in: &context)
+    }
+
+    private func noticeboard(in context: inout GraphicsContext) {
+        let u: CGFloat = 4.1
+        polygon([point(u, 0, 2.9), point(u + 1.1, 0, 2.9), point(u + 1.1, 0, 1.65), point(u, 0, 1.65)],
+                color: Color(hex: 0xBEAB8A), in: &context)
+        for index in 0..<3 {
+            let offset = CGFloat(index % 2) * 0.48
+            let top = 2.7 - CGFloat(index / 2) * 0.6
+            polygon([point(u + 0.13 + offset, 0.02, top), point(u + 0.48 + offset, 0.02, top),
+                     point(u + 0.48 + offset, 0.02, top - 0.4), point(u + 0.13 + offset, 0.02, top - 0.4)],
+                    color: index == 1 ? Palette.parcel(1) : Palette.surface, in: &context)
+        }
+    }
+
+    private func loadingDoor(in context: inout GraphicsContext) {
+        let u = roomWidth - 2.8
+        let width: CGFloat = 2.35
+        let height: CGFloat = stage == 0 ? 2.5 : 3.1
+        let outline = [point(u, 0.02, height), point(u + width, 0.02, height),
+                       point(u + width, 0.02), point(u, 0.02)]
+        polygon(outline, color: Color(hex: stage < 2 ? 0x7E9E8D : 0xA6B0A0), in: &context)
+        context.stroke(path(outline), with: .color(Color(hex: 0x748D7B)), lineWidth: 3)
+        if stage < 2 {
+            polygon([point(u + 0.3, 0.04, height - 0.3), point(u + width - 0.3, 0.04, height - 0.3),
+                     point(u + width - 0.3, 0.04, 1.1), point(u + 0.3, 0.04, 1.1)],
+                    color: Color(hex: 0xC2D6C9), in: &context)
+            line(point(u + width - 0.35, 0.08, 0.9), point(u + width - 0.35, 0.08, 1.15),
+                 color: Palette.surface, width: 2, in: &context)
+            if stage == 1 {
+                cuboid(u: u - 0.1, v: 0, z: height, width: width + 0.2, depth: 0.35, height: 0.15,
+                        color: Palette.accent, in: &context)
+            }
+        } else {
+            for z in stride(from: CGFloat(0.25), to: height, by: 0.3) {
+                line(point(u + 0.08, 0.07, z), point(u + width - 0.08, 0.07, z),
+                     color: Palette.ink.opacity(0.25), width: 1, in: &context)
+            }
+            line(point(u + 0.65, 0.1, 0.2), point(u + width - 0.65, 0.1, 0.2),
+                 color: Palette.ink, width: 2, in: &context)
+        }
+        wallSign(stage == 0 ? "SHIPMENTS" : "OUTBOUND", center: point(u + width / 2, 0, height + 0.4),
+                 angle: 25, width: 68, in: &context)
+    }
+
+    private func wallSign(_ title: String, center: CGPoint, angle: Double, width: CGFloat, in context: inout GraphicsContext) {
+        var sign = context
+        sign.translateBy(x: center.x, y: center.y)
+        sign.rotate(by: .degrees(angle))
+        let rect = CGRect(x: -width / 2, y: -9, width: width, height: 18)
+        sign.fill(Path(roundedRect: rect.offsetBy(dx: 1, dy: 2), cornerRadius: 3), with: .color(Palette.ink.opacity(0.1)))
+        sign.fill(Path(roundedRect: rect, cornerRadius: 3), with: .color(Palette.surface))
+        sign.draw(Text(title).font(.system(size: title == "PARCEL PACK" ? 10 : 8, weight: .black, design: .rounded))
+            .foregroundStyle(Palette.accent), at: .zero)
+    }
+
+    private func ceilingLight(at origin: CGPoint, in context: inout GraphicsContext) {
+        context.fill(Path(roundedRect: CGRect(x: origin.x - 14, y: origin.y - 2, width: 28, height: 5), cornerRadius: 2),
+                     with: .color(Palette.cardboard))
+        context.fill(Path(roundedRect: CGRect(x: origin.x - 11, y: origin.y - 1, width: 22, height: 2), cornerRadius: 1),
                      with: .color(Palette.surface))
-        line(from: CGPoint(x: origin.x - 1, y: origin.y - 10), to: CGPoint(x: origin.x + 4, y: origin.y - 10),
-             color: Palette.accent, width: 1, in: &context)
     }
 
-    private func dispatchDesk(at origin: CGPoint, in context: inout GraphicsContext) {
-        let x = origin.x, y = origin.y
-        line(from: CGPoint(x: x - 12, y: y + 2), to: CGPoint(x: x - 12, y: y + 17), color: Palette.ink, width: 3, in: &context)
-        line(from: CGPoint(x: x + 15, y: y + 9), to: CGPoint(x: x + 15, y: y + 23), color: Palette.ink, width: 3, in: &context)
-        polygon([CGPoint(x: x - 17, y: y), CGPoint(x: x - 5, y: y - 5), CGPoint(x: x + 22, y: y + 5), CGPoint(x: x + 10, y: y + 10)],
-                color: Color(hex: 0xDAB987), in: &context)
-        polygon([CGPoint(x: x - 3, y: y - 14), CGPoint(x: x + 12, y: y - 9), CGPoint(x: x + 12, y: y + 1), CGPoint(x: x - 3, y: y - 4)],
-                color: Palette.ink, in: &context)
-        polygon([CGPoint(x: x - 1, y: y - 12), CGPoint(x: x + 10, y: y - 8), CGPoint(x: x + 10, y: y - 1), CGPoint(x: x - 1, y: y - 5)],
-                color: Color(hex: 0x9DCBC6), in: &context)
-    }
-
-    private func conveyor(at origin: CGPoint, level: Int, in context: inout GraphicsContext) {
-        let length = CGFloat(46 + min(30, level))
-        let x = origin.x, y = origin.y, rise = length * 0.35
-        polygon([CGPoint(x: x, y: y), CGPoint(x: x + 8, y: y - 4), CGPoint(x: x + length + 8, y: y + rise - 4), CGPoint(x: x + length, y: y + rise)],
-                color: Palette.ink, in: &context)
-        line(from: CGPoint(x: x, y: y + 2), to: CGPoint(x: x + length, y: y + rise + 2),
-             color: Color(hex: 0x899F8B), width: 3, in: &context)
-        for offset in stride(from: CGFloat(6), through: length - 4, by: 9) {
-            line(from: CGPoint(x: x + offset, y: y + offset * 0.35),
-                 to: CGPoint(x: x + offset + 8, y: y + offset * 0.35 - 4),
-                 color: Palette.surface.opacity(0.45), width: 1, in: &context)
-        }
-        for offset in [CGFloat(8), length - 7] {
-            line(from: CGPoint(x: x + offset, y: y + offset * 0.35 + 2),
-                 to: CGPoint(x: x + offset, y: y + offset * 0.35 + 9),
-                 color: Palette.ink, width: 3, in: &context)
-        }
-        box(at: CGPoint(x: x + length * 0.6, y: y + length * 0.21 - 2), width: 12, height: 10,
-            color: Palette.cardboard, in: &context)
-    }
-
-    private func person(at origin: CGPoint, shirt: Color, manager: Bool, in context: inout GraphicsContext) {
-        let x = origin.x, y = origin.y
-        context.fill(Path(ellipseIn: CGRect(x: x - 6, y: y - 2, width: 13, height: 5)), with: .color(Palette.ink.opacity(0.12)))
-        line(from: CGPoint(x: x - 2, y: y - 8), to: CGPoint(x: x - 3, y: y), color: Palette.ink, width: 3, in: &context)
-        line(from: CGPoint(x: x + 2, y: y - 8), to: CGPoint(x: x + 4, y: y), color: Palette.ink, width: 3, in: &context)
-        context.fill(Path(roundedRect: CGRect(x: x - 5, y: y - 21, width: 10, height: 15), cornerRadius: 3), with: .color(shirt))
-        line(from: CGPoint(x: x - 4, y: y - 18), to: CGPoint(x: x - 8, y: y - 12), color: shirt, width: 3, in: &context)
-        line(from: CGPoint(x: x + 4, y: y - 18), to: CGPoint(x: x + 8, y: y - 14), color: shirt, width: 3, in: &context)
-        context.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 29, width: 8, height: 9)), with: .color(Color(hex: 0xCDA77E)))
-        if manager {
-            line(from: CGPoint(x: x, y: y - 20), to: CGPoint(x: x, y: y - 12), color: Palette.surface, width: 2, in: &context)
-            context.fill(Path(roundedRect: CGRect(x: x + 5, y: y - 17, width: 6, height: 8), cornerRadius: 1), with: .color(Palette.surface))
-        } else {
-            context.fill(Path(roundedRect: CGRect(x: x - 5, y: y - 30, width: 10, height: 4), cornerRadius: 2), with: .color(shirt))
-        }
-    }
-
-    private func shelf(at origin: CGPoint, stocked: Int, in context: inout GraphicsContext) {
-        let x = origin.x, y = origin.y
-        polygon([CGPoint(x: x - 12, y: y - 45), CGPoint(x: x + 11, y: y - 54), CGPoint(x: x + 11, y: y), CGPoint(x: x - 12, y: y + 9)],
-                color: Color(hex: 0x899F8B), in: &context)
-        for row in 0..<3 {
-            let top = y - CGFloat(row) * 17
-            line(from: CGPoint(x: x - 12, y: top + 4), to: CGPoint(x: x + 11, y: top - 5),
-                 color: Palette.ink.opacity(0.45), width: 3, in: &context)
-            for column in 0..<2 where row * 2 + column < stocked {
-                let bx = x - 9 + CGFloat(column) * 11
-                box(at: CGPoint(x: bx, y: top - 3 - CGFloat(column) * 4), width: 10, height: 10,
-                    color: Palette.parcel(row + column), in: &context)
+    private func rack(u: CGFloat, v: CGFloat, upgraded: Bool, stock: Int, in context: inout GraphicsContext) {
+        let height: CGFloat = upgraded ? 2.65 : 1.9
+        let metal = upgraded ? Color(hex: 0x648875) : Color(hex: 0xAA8860)
+        polygon([point(u, v), point(u, v + 1.95), point(u, v + 1.95, height), point(u, v, height)],
+                color: Color(hex: upgraded ? 0xA7B9A4 : 0xC5AF88), in: &context)
+        let tiers = upgraded ? 3 : 2
+        for row in 0..<tiers {
+            let z = 0.16 + CGFloat(row) * 0.82
+            cuboid(u: u, v: v, z: z, width: 0.8, depth: 1.95, height: 0.1, color: metal, in: &context)
+            for column in 0..<3 where row * 3 + column < stock {
+                parcel(u: u + 0.05, v: v + 0.09 + CGFloat(column) * 0.61, z: z + 0.1,
+                       width: 0.65, depth: 0.5, height: 0.57,
+                       color: row == 0 ? Color(hex: 0xD5B789) : Palette.parcel(row + column), in: &context)
             }
         }
-        line(from: CGPoint(x: x - 12, y: y - 45), to: CGPoint(x: x - 12, y: y + 10), color: Palette.ink.opacity(0.4), width: 3, in: &context)
-        line(from: CGPoint(x: x + 11, y: y - 54), to: CGPoint(x: x + 11, y: y), color: Palette.ink.opacity(0.4), width: 3, in: &context)
+        for end in [v, v + 1.95] {
+            for front in [u, u + 0.8] {
+                line(point(front, end), point(front, end, height), color: metal, width: upgraded ? 3 : 2, in: &context)
+            }
+        }
+        cuboid(u: u, v: v, z: height, width: 0.8, depth: 1.95, height: 0.1, color: metal, in: &context)
     }
 
-    private func workbench(at origin: CGPoint, upgraded: Bool, in context: inout GraphicsContext) {
-        let x = origin.x, y = origin.y
-        for corner in [CGPoint(x: x - 27, y: y), CGPoint(x: x + 3, y: y + 11), CGPoint(x: x + 29, y: y)] {
-            line(from: corner, to: CGPoint(x: corner.x, y: corner.y + 22), color: Palette.ink.opacity(0.75), width: 4, in: &context)
+    private func packingBench(u: CGFloat, v: CGFloat, level: Int, withPrinter: Bool, in context: inout GraphicsContext) {
+        let legColor = level > 0 ? Color(hex: 0x719581) : Color(hex: 0x9A7951)
+        for leg in [(CGFloat(0.15), CGFloat(0.15)), (2.55, 0.15), (0.15, 1.45), (2.55, 1.45)] {
+            cuboid(u: u + leg.0, v: v + leg.1, z: 0, width: 0.13, depth: 0.13, height: 1.2, color: legColor, in: &context)
         }
-        polygon([CGPoint(x: x - 31, y: y - 4), CGPoint(x: x - 4, y: y - 16), CGPoint(x: x + 32, y: y - 4), CGPoint(x: x + 5, y: y + 9)],
-                color: upgraded ? Color(hex: 0x86B2A1) : Color(hex: 0xDCB780), in: &context)
-        polygon([CGPoint(x: x - 31, y: y - 4), CGPoint(x: x + 5, y: y + 9), CGPoint(x: x + 5, y: y + 13), CGPoint(x: x - 31, y: y)],
-                color: upgraded ? Palette.accent : Color(hex: 0xBB9364), in: &context)
-        box(at: CGPoint(x: x - 7, y: y - 9), width: 19, height: 12, color: Palette.cardboard, in: &context)
-        if upgraded {
-            context.fill(Path(roundedRect: CGRect(x: x + 12, y: y - 9, width: 10, height: 5), cornerRadius: 2), with: .color(Palette.surface))
+        cuboid(u: u, v: v, z: 1.2, width: 2.85, depth: 1.7, height: 0.17,
+                color: level > 0 ? Color(hex: 0x8DB5A0) : Color(hex: 0xD9B888), in: &context)
+        floorZone(u: u + 0.2, v: v + 0.2, width: 1.65, depth: 1.2, z: 1.39,
+                  color: Palette.accent.opacity(0.75), in: &context)
+        for offset in [CGFloat(0.5), 1.0, 1.5] {
+            line(point(u + offset, v + 0.2, 1.4), point(u + offset, v + 1.4, 1.4),
+                 color: Palette.surface.opacity(0.18), width: 0.6, in: &context)
+        }
+        parcel(u: u + 0.4, v: v + 0.45, z: 1.4, width: 0.9, depth: 0.72, height: 0.7,
+               color: Color(hex: 0xE0BF90), in: &context)
+        parcel(u: u + 1.1, v: v + 1.0, z: 1.4, width: 0.55, depth: 0.5, height: 0.45,
+               color: Palette.parcel(2), in: &context)
+        if withPrinter {
+            cuboid(u: u + 2.02, v: v + 0.45, z: 1.4, width: 0.65, depth: 0.6, height: 0.38,
+                    color: Palette.ink, in: &context)
+            floorZone(u: u + 2.13, v: v + 0.5, width: 0.42, depth: 0.47, z: 1.8,
+                      color: Palette.surface, in: &context)
+            line(point(u + 2.2, v + 0.6, 1.82), point(u + 2.5, v + 0.6, 1.82), color: Palette.accent, width: 1, in: &context)
+        } else {
+            floorZone(u: u + 2.05, v: v + 0.25, width: 0.58, depth: 0.72, z: 1.39,
+                      color: Palette.surface, in: &context)
+        }
+        let tape = point(u + 2.2, v + 1.15, 1.42)
+        context.fill(Path(ellipseIn: CGRect(x: tape.x - 4, y: tape.y - 2, width: 8, height: 5)), with: .color(Palette.parcel(1)))
+        context.fill(Path(ellipseIn: CGRect(x: tape.x - 1.5, y: tape.y - 1, width: 3, height: 2)), with: .color(Palette.surface))
+        if level >= 20 {
+            line(point(u + 0.1, v + 1.7, 0.9), point(u + 2.75, v + 1.7, 0.9),
+                 color: Palette.accent, width: 3, in: &context)
         }
     }
 
-    private func box(at origin: CGPoint, width: CGFloat, height: CGFloat, color: Color, in context: inout GraphicsContext) {
-        let x = origin.x, y = origin.y, half = width / 2, depth = width * 0.32
-        polygon([CGPoint(x: x, y: y - height), CGPoint(x: x + half, y: y - height - depth), CGPoint(x: x + width, y: y - height), CGPoint(x: x + half, y: y - height + depth)],
-                color: color, in: &context)
-        polygon([CGPoint(x: x, y: y - height), CGPoint(x: x + half, y: y - height + depth), CGPoint(x: x + half, y: y + depth), CGPoint(x: x, y: y)],
-                color: color.opacity(0.8), in: &context)
-        polygon([CGPoint(x: x + half, y: y - height + depth), CGPoint(x: x + width, y: y - height), CGPoint(x: x + width, y: y), CGPoint(x: x + half, y: y + depth)],
-                color: color.opacity(0.62), in: &context)
-        line(from: CGPoint(x: x + width * 0.26, y: y - height - depth * 0.5),
-             to: CGPoint(x: x + width * 0.76, y: y - height + depth * 0.5), color: Palette.surface.opacity(0.8), width: 2, in: &context)
-    }
-
-    private func loadingBay(at origin: CGPoint, large: Bool, in context: inout GraphicsContext) {
-        let x = origin.x, y = origin.y, width: CGFloat = large ? 53 : 42
-        polygon([CGPoint(x: x, y: y), CGPoint(x: x + width, y: y + width * 0.36), CGPoint(x: x + width, y: y + width * 0.36 + 34), CGPoint(x: x, y: y + 34)],
-                color: Color(hex: 0xA1AFA0), in: &context)
-        for row in 1..<5 {
-            line(from: CGPoint(x: x + 2, y: y + CGFloat(row) * 6),
-                 to: CGPoint(x: x + width - 2, y: y + width * 0.36 + CGFloat(row) * 6),
-                 color: Palette.ink.opacity(0.22), width: 1, in: &context)
-        }
-        if !large {
-            polygon([CGPoint(x: x - 2, y: y - 4), CGPoint(x: x + width + 2, y: y + width * 0.36 - 4),
-                     CGPoint(x: x + width + 2, y: y + width * 0.36 + 3), CGPoint(x: x - 2, y: y + 3)],
+    private func dispatchDesk(u: CGFloat, v: CGFloat, in context: inout GraphicsContext) {
+        for corner in [(CGFloat(0.15), CGFloat(0.15)), (1.5, 0.15), (0.15, 1.0), (1.5, 1.0)] {
+            cuboid(u: u + corner.0, v: v + corner.1, z: 0, width: 0.1, depth: 0.1, height: 1.25,
                     color: Palette.accent, in: &context)
         }
+        cuboid(u: u, v: v, z: 1.25, width: 1.75, depth: 1.2, height: 0.12,
+                color: Color(hex: 0xDAB98A), in: &context)
+        let monitor = [point(u + 0.25, v + 0.4, 2.15), point(u + 1.1, v + 0.4, 2.15),
+                       point(u + 1.1, v + 0.4, 1.55), point(u + 0.25, v + 0.4, 1.55)]
+        polygon(monitor, color: Palette.ink, in: &context)
+        polygon([point(u + 0.32, v + 0.42, 2.07), point(u + 1.03, v + 0.42, 2.07),
+                 point(u + 1.03, v + 0.42, 1.65), point(u + 0.32, v + 0.42, 1.65)],
+                color: Color(hex: 0xACD1C2), in: &context)
+        line(point(u + 0.65, v + 0.4, 1.55), point(u + 0.65, v + 0.4, 1.38), color: Palette.ink, width: 2, in: &context)
+        floorZone(u: u + 1.15, v: v + 0.45, width: 0.45, depth: 0.5, z: 1.39, color: Palette.surface, in: &context)
     }
 
-    private func van(at origin: CGPoint, upgraded: Bool, in context: inout GraphicsContext) {
-        let x = origin.x, y = origin.y
-        let color = upgraded ? Color(hex: 0x267B61) : Color(hex: 0x70A69C)
-        context.fill(Path(roundedRect: CGRect(x: x, y: y - 22, width: 50, height: 25), cornerRadius: 5), with: .color(color))
-        polygon([CGPoint(x: x + 36, y: y - 22), CGPoint(x: x + 54, y: y - 15), CGPoint(x: x + 58, y: y + 3), CGPoint(x: x + 36, y: y + 3)],
-                color: Palette.accent, in: &context)
-        polygon([CGPoint(x: x + 39, y: y - 19), CGPoint(x: x + 51, y: y - 14), CGPoint(x: x + 53, y: y - 6), CGPoint(x: x + 39, y: y - 6)],
-                color: Color(hex: 0xD8E9E2), in: &context)
-        for wheel in [x + 10, x + 46] {
-            context.fill(Path(ellipseIn: CGRect(x: wheel - 5, y: y - 1, width: 10, height: 10)), with: .color(Palette.ink))
-            context.fill(Path(ellipseIn: CGRect(x: wheel - 2, y: y + 2, width: 4, height: 4)), with: .color(Palette.surface))
+    private func conveyor(u: CGFloat, v: CGFloat, level: Int, in context: inout GraphicsContext) {
+        let width: CGFloat = 1.8 + CGFloat(min(30, level)) * 0.065
+        for end in [u + 0.15, u + width - 0.2] {
+            cuboid(u: end, v: v + 0.25, z: 0, width: 0.12, depth: 0.12, height: 0.6, color: Palette.accent, in: &context)
         }
-        context.draw(Text(Image(systemName: "shippingbox.fill")).font(.system(size: 12)).foregroundStyle(Palette.surface),
-                     at: CGPoint(x: x + 20, y: y - 10))
+        cuboid(u: u, v: v, z: 0.6, width: width, depth: 0.65, height: 0.2, color: Palette.ink, in: &context)
+        for offset in stride(from: CGFloat(0.12), to: width, by: 0.2) {
+            line(point(u + offset, v, 0.81), point(u + offset, v + 0.65, 0.81),
+                 color: Color(hex: 0xAEC0AF), width: 1.2, in: &context)
+        }
+        line(point(u, v + 0.65, 0.83), point(u + width, v + 0.65, 0.83), color: Palette.accent, width: 2, in: &context)
+        parcel(u: u + width * 0.5, v: v + 0.08, z: 0.83, width: 0.55, depth: 0.48, height: 0.48,
+               color: Palette.cardboard, in: &context)
+    }
+
+    private func pallet(u: CGFloat, v: CGFloat, in context: inout GraphicsContext) {
+        cuboid(u: u, v: v, z: 0, width: 1.5, depth: 1.25, height: 0.12, color: Color(hex: 0xB0926E), in: &context)
+        for offset in stride(from: CGFloat(0.15), to: 1.4, by: 0.3) {
+            line(point(u + offset, v, 0.13), point(u + offset, v + 1.25, 0.13),
+                 color: Color(hex: 0xE0CCA8), width: 2, in: &context)
+        }
+    }
+
+    private func handCart(u: CGFloat, v: CGFloat, in context: inout GraphicsContext) {
+        line(point(u, v), point(u, v, 1.65), color: Palette.accent, width: 3, in: &context)
+        line(point(u, v + 0.6), point(u, v + 0.6, 1.65), color: Palette.accent, width: 3, in: &context)
+        line(point(u, v, 1.65), point(u, v + 0.6, 1.65), color: Palette.accent, width: 3, in: &context)
+        for end in [v, v + 0.6] {
+            let wheel = point(u + 0.1, end)
+            context.fill(Path(ellipseIn: CGRect(x: wheel.x - 3, y: wheel.y - 3, width: 6, height: 6)), with: .color(Palette.ink))
+        }
+        parcel(u: u - 0.4, v: v + 0.08, z: 0.1, width: 0.5, depth: 0.45, height: 0.6,
+               color: Palette.cardboard, in: &context)
+    }
+
+    private func drawStaff(in context: inout GraphicsContext) {
+        let workerPositions: [(CGFloat, CGFloat)] = [(4.5, 5.15), (5.65, 4.9), (6.1, 6.25), (2.35, 3.6), (7.15, 3.9), (6.9, 5.9)]
+        var shown = 0
+        for (customerIndex, customer) in TycoonAccount.automatableCustomers.enumerated() {
+            let count = account.teams[customer]?.workers ?? 0
+            for _ in 0..<min(count, 2) where shown < workerPositions.count {
+                let position = workerPositions[shown]
+                person(at: point(min(position.0, roomWidth - 0.8), min(position.1, roomDepth - 0.5)),
+                       color: Palette.parcel(customerIndex + 2), manager: false, in: &context)
+                shown += 1
+            }
+        }
+        for index in 0..<min(managers, 3) {
+            person(at: point(roomWidth - 2.8 + CGFloat(index) * 0.55, 2.8 + CGFloat(index) * 0.6),
+                   color: Palette.accent, manager: true, in: &context)
+        }
+    }
+
+    private func person(at origin: CGPoint, color: Color, manager: Bool, in context: inout GraphicsContext) {
+        let x = origin.x, y = origin.y
+        context.fill(Path(ellipseIn: CGRect(x: x - 7, y: y - 1, width: 15, height: 6)), with: .color(Palette.ink.opacity(0.13)))
+        line(CGPoint(x: x - 2, y: y - 9), CGPoint(x: x - 3, y: y), color: Palette.ink, width: 3, in: &context)
+        line(CGPoint(x: x + 2, y: y - 9), CGPoint(x: x + 4, y: y), color: Palette.ink, width: 3, in: &context)
+        context.fill(Path(roundedRect: CGRect(x: x - 5, y: y - 23, width: 11, height: 16), cornerRadius: 4), with: .color(color))
+        line(CGPoint(x: x - 4, y: y - 19), CGPoint(x: x - 7, y: y - 13), color: color, width: 3, in: &context)
+        line(CGPoint(x: x + 5, y: y - 19), CGPoint(x: x + 8, y: y - 14), color: color, width: 3, in: &context)
+        context.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 31, width: 9, height: 10)), with: .color(Color(hex: 0xC9A37C)))
+        if manager {
+            line(CGPoint(x: x, y: y - 21), CGPoint(x: x + 1, y: y - 13), color: Palette.surface, width: 2, in: &context)
+            context.fill(Path(roundedRect: CGRect(x: x + 5, y: y - 18, width: 7, height: 9), cornerRadius: 1), with: .color(Palette.surface))
+            line(CGPoint(x: x + 7, y: y - 15), CGPoint(x: x + 10, y: y - 15), color: Palette.muted, width: 1, in: &context)
+        } else {
+            context.fill(Path(roundedRect: CGRect(x: x - 5, y: y - 32, width: 11, height: 4), cornerRadius: 2), with: .color(color))
+            context.fill(Path(roundedRect: CGRect(x: x - 3, y: y - 20, width: 7, height: 11), cornerRadius: 2), with: .color(Palette.surface.opacity(0.35)))
+        }
+    }
+
+    private func van(at origin: CGPoint, level: Int, in context: inout GraphicsContext) {
+        let x = origin.x, y = origin.y
+        context.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 1, width: 78, height: 13)), with: .color(Palette.ink.opacity(0.11)))
+        let color = level >= 10 ? Palette.accent : Color(hex: 0x75A596)
+        polygon([CGPoint(x: x, y: y - 30), CGPoint(x: x + 13, y: y - 35), CGPoint(x: x + 54, y: y - 21), CGPoint(x: x + 41, y: y - 16)],
+                color: Color(hex: 0x9FC4AF), in: &context)
+        polygon([CGPoint(x: x, y: y - 30), CGPoint(x: x + 41, y: y - 16), CGPoint(x: x + 41, y: y + 5), CGPoint(x: x, y: y - 9)],
+                color: color, in: &context)
+        polygon([CGPoint(x: x + 41, y: y - 16), CGPoint(x: x + 54, y: y - 21), CGPoint(x: x + 69, y: y - 5), CGPoint(x: x + 58, y: y + 9), CGPoint(x: x + 41, y: y + 5)],
+                color: Palette.accent, in: &context)
+        polygon([CGPoint(x: x + 46, y: y - 14), CGPoint(x: x + 53, y: y - 17), CGPoint(x: x + 62, y: y - 7), CGPoint(x: x + 55, y: y - 3)],
+                color: Color(hex: 0xD2E5DB), in: &context)
+        for wheel in [CGPoint(x: x + 11, y: y - 6), CGPoint(x: x + 50, y: y + 7)] {
+            context.fill(Path(ellipseIn: CGRect(x: wheel.x - 5, y: wheel.y - 5, width: 10, height: 10)), with: .color(Palette.ink))
+            context.fill(Path(ellipseIn: CGRect(x: wheel.x - 2, y: wheel.y - 2, width: 4, height: 4)), with: .color(Palette.surface))
+        }
+        var badge = context
+        badge.translateBy(x: x + 21, y: y - 13)
+        badge.rotate(by: .degrees(19))
+        badge.draw(Text(Image(systemName: "shippingbox.fill")).font(.system(size: 12)).foregroundStyle(Palette.surface), at: .zero)
+        line(CGPoint(x: x + 3, y: y - 12), CGPoint(x: x + 36, y: y), color: Palette.surface.opacity(0.65), width: 2, in: &context)
     }
 
     private func plant(at origin: CGPoint, in context: inout GraphicsContext) {
-        context.fill(Path(roundedRect: CGRect(x: origin.x - 6, y: origin.y - 6, width: 12, height: 13), cornerRadius: 3), with: .color(Palette.parcel(0)))
-        for leaf in [CGFloat(-1), 0, 1] {
-            context.fill(Path(ellipseIn: CGRect(x: origin.x - 5 + leaf * 5, y: origin.y - 22 - abs(leaf) * 3, width: 9, height: 18)), with: .color(Palette.accent))
+        context.fill(Path(roundedRect: CGRect(x: origin.x - 6, y: origin.y - 6, width: 13, height: 11), cornerRadius: 3), with: .color(Palette.parcel(0)))
+        for offset in [CGFloat(-5), 0, 5] {
+            context.fill(Path(ellipseIn: CGRect(x: origin.x + offset - 4, y: origin.y - 20 - abs(offset) * 0.5, width: 8, height: 16)), with: .color(Palette.accent))
         }
     }
 
+    private func parcel(u: CGFloat, v: CGFloat, z: CGFloat, width: CGFloat, depth: CGFloat, height: CGFloat, color: Color, in context: inout GraphicsContext) {
+        cuboid(u: u, v: v, z: z, width: width, depth: depth, height: height, color: color, in: &context)
+        floorZone(u: u + width * 0.42, v: v, width: width * 0.18, depth: depth, z: z + height + 0.01,
+                  color: Palette.surface.opacity(0.65), in: &context)
+        polygon([point(u + width * 0.42, v + depth + 0.01, z + height), point(u + width * 0.6, v + depth + 0.01, z + height),
+                 point(u + width * 0.6, v + depth + 0.01, z), point(u + width * 0.42, v + depth + 0.01, z)],
+                color: Palette.surface.opacity(0.4), in: &context)
+        if width >= 0.7 {
+            polygon([point(u + width * 0.12, v + depth + 0.02, z + height * 0.7),
+                     point(u + width * 0.36, v + depth + 0.02, z + height * 0.7),
+                     point(u + width * 0.36, v + depth + 0.02, z + height * 0.35),
+                     point(u + width * 0.12, v + depth + 0.02, z + height * 0.35)],
+                    color: Palette.surface.opacity(0.85), in: &context)
+        }
+    }
+
+    private func cuboid(u: CGFloat, v: CGFloat, z: CGFloat, width: CGFloat, depth: CGFloat, height: CGFloat, color: Color, in context: inout GraphicsContext) {
+        let right = [point(u + width, v, z), point(u + width, v + depth, z),
+                     point(u + width, v + depth, z + height), point(u + width, v, z + height)]
+        let front = [point(u, v + depth, z), point(u + width, v + depth, z),
+                     point(u + width, v + depth, z + height), point(u, v + depth, z + height)]
+        let top = [point(u, v, z + height), point(u + width, v, z + height),
+                   point(u + width, v + depth, z + height), point(u, v + depth, z + height)]
+        polygon(right, color: color, in: &context)
+        polygon(right, color: Palette.ink.opacity(0.17), in: &context)
+        polygon(front, color: color, in: &context)
+        polygon(front, color: Palette.ink.opacity(0.07), in: &context)
+        polygon(top, color: color, in: &context)
+        polygon(top, color: Palette.surface.opacity(0.12), in: &context)
+    }
+
+    private func floorZone(u: CGFloat, v: CGFloat, width: CGFloat, depth: CGFloat, z: CGFloat = 0.02, color: Color, in context: inout GraphicsContext) {
+        polygon([point(u, v, z), point(u + width, v, z), point(u + width, v + depth, z), point(u, v + depth, z)],
+                color: color, in: &context)
+    }
+
+    private func path(_ points: [CGPoint]) -> Path {
+        var result = Path()
+        guard let first = points.first else { return result }
+        result.move(to: first)
+        points.dropFirst().forEach { result.addLine(to: $0) }
+        result.closeSubpath()
+        return result
+    }
+
     private func polygon(_ points: [CGPoint], color: Color, in context: inout GraphicsContext) {
-        guard let first = points.first else { return }
-        var path = Path()
-        path.move(to: first)
-        points.dropFirst().forEach { path.addLine(to: $0) }
-        path.closeSubpath()
-        context.fill(path, with: .color(color))
+        context.fill(path(points), with: .color(color))
     }
 
-    private func line(from: CGPoint, to: CGPoint, color: Color, width: CGFloat, in context: inout GraphicsContext) {
-        var path = Path()
-        path.move(to: from)
-        path.addLine(to: to)
-        context.stroke(path, with: .color(color), lineWidth: width)
+    private func gradient(_ points: [CGPoint], colors: [Color], from: CGPoint, to: CGPoint, in context: inout GraphicsContext) {
+        context.fill(path(points), with: .linearGradient(Gradient(colors: colors), startPoint: from, endPoint: to))
     }
 
-    private func interpolate(_ from: CGPoint, _ to: CGPoint, _ fraction: CGFloat) -> CGPoint {
-        CGPoint(x: from.x + (to.x - from.x) * fraction, y: from.y + (to.y - from.y) * fraction)
+    private func line(_ from: CGPoint, _ to: CGPoint, color: Color, width: CGFloat, in context: inout GraphicsContext) {
+        var line = Path()
+        line.move(to: from)
+        line.addLine(to: to)
+        context.stroke(line, with: .color(color), lineWidth: width)
     }
 }

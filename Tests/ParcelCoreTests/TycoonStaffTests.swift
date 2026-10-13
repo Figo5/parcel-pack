@@ -43,7 +43,7 @@ import Testing
         #expect(account.isValid)
     }
 
-    @Test func workersPackThreePendingOrdersThenStopUntilCollected() throws {
+    @Test func allWorkersContinuouslyShipWithoutAStorageOrCollectionBottleneck() throws {
         var account = funded()
         #expect({ account.hireWorker(for: .cornerMarket) }())
         let cash = account.cash
@@ -53,30 +53,25 @@ import Testing
         #expect(interval == 120)
         #expect(pay == 45)
         let first = account.advanceStaff(by: interval * 100)
-        #expect(first.packedOrders == 3)
-        #expect(first.earned == 0)
-        #expect(account.teams[.cornerMarket]?.pendingOrders == 3)
-        #expect(account.teams[.cornerMarket]?.pendingCash == pay * 3)
-        #expect(account.cash == cash)
-        #expect(account.automatedOrders == 0)
-        #expect({ account.advanceStaff(by: interval).isEmpty }())
-        let collected = account.collectStaff(for: .cornerMarket)
-        #expect(collected == pay * 3)
-        #expect(account.cash == cash + collected)
-        #expect(account.automatedOrders == 3)
-        #expect(account.completedOrders == manual)
+        #expect(first.packedOrders == 100)
+        #expect(first.earned == pay * 100)
         #expect(account.teams[.cornerMarket]?.pendingOrders == 0)
+        #expect(account.teams[.cornerMarket]?.pendingCash == 0)
+        #expect(account.cash == cash + first.earned)
+        #expect(account.automatedOrders == 100)
+        #expect(account.completedOrders == manual)
         #expect({ account.collectStaff(for: .cornerMarket) == 0 }())
         #expect({ account.advanceStaff(by: interval).packedOrders == 1 }())
+        #expect(account.automatedOrders == 101)
         #expect(account.isValid)
     }
 
     @Test func managerCollectsExistingWorkAndAutomaticallyShipsFutureOrders() throws {
         var account = funded()
         #expect({ account.hireWorker(for: .bookshop) }())
-        let interval = account.workerInterval(for: .bookshop)
         let pay = account.workerPayout(for: .bookshop)
-        _ = account.advanceStaff(by: interval * 2)
+        account.teams[.bookshop]?.pendingCash = pay * 2
+        account.teams[.bookshop]?.pendingOrders = 2
         let cost = try #require(account.managerCost(for: .bookshop))
         let cash = account.cash
         #expect({ account.hireManager(for: .bookshop) }())
@@ -84,9 +79,13 @@ import Testing
         #expect(account.teams[.bookshop]?.hasManager == true)
         #expect(account.teams[.bookshop]?.pendingOrders == 0)
         #expect(account.automatedOrders == 2)
+        let interval = account.workerInterval(for: .bookshop)
+        let managerPay = account.workerPayout(for: .bookshop)
+        #expect(interval == 96)
+        #expect(managerPay == pay * 125 / 100)
         let report = account.advanceStaff(by: interval * 5)
         #expect(report.packedOrders == 5)
-        #expect(report.earned == pay * 5)
+        #expect(report.earned == managerPay * 5)
         #expect(account.automatedOrders == 7)
         #expect(account.managerCost(for: .bookshop) == nil)
         #expect({ !account.hireManager(for: .bookshop) }())
@@ -96,7 +95,6 @@ import Testing
     @Test func fractionalProgressPersistsAndCatchupIsCappedAtEightHours() {
         var account = funded()
         #expect({ account.hireWorker(for: .cornerMarket) }())
-        #expect({ account.hireManager(for: .cornerMarket) }())
         #expect({ account.advanceStaff(by: 119).isEmpty }())
         #expect(account.teams[.cornerMarket]?.progressSeconds == 119)
         let one = account.advanceStaff(by: 1)
@@ -142,7 +140,7 @@ import Testing
         let delivered = try #require({ account.ship(accepted) }())
         #expect(delivered.order.sequence == 1_001)
         #expect(account.completedOrders == 1_001)
-        #expect(account.automatedOrders == 30)
+        #expect(account.automatedOrders == 37)
         #expect(account.isValid)
     }
 
@@ -166,6 +164,8 @@ import Testing
     @Test func nonfiniteElapsedAndCorruptStaffCannotMutateTheBank() {
         var account = funded()
         #expect({ account.hireWorker(for: .cornerMarket) }())
+        account.teams[.cornerMarket]?.pendingOrders = 3
+        account.teams[.cornerMarket]?.pendingCash = 135
         let saved = account
         for elapsed in [-1.0, .infinity, -.infinity, .nan] {
             #expect({ account.advanceStaff(by: elapsed).isEmpty }())
@@ -208,7 +208,7 @@ import Testing
         #expect(account.automatedOrders == 10_000_000)
     }
 
-    @Test func pendingShipmentsReserveSpaceAtBothLimitsUntilCollected() {
+    @Test func continuouslyShippedOrdersStopAtBothBusinessLimits() {
         for limitingMoney in [true, false] {
             var account = funded()
             #expect({ account.hireWorker(for: .cornerMarket) }())
@@ -221,10 +221,11 @@ import Testing
             }
             let report = account.advanceStaff(by: 28_800)
             #expect(report.packedOrders == 2)
-            #expect(account.teams[.cornerMarket]?.pendingCash == 90)
+            #expect(account.teams[.cornerMarket]?.pendingCash == 0)
+            #expect(report.earned == 90)
             #expect(account.isValid)
             #expect({ account.advanceStaff(by: 28_800).isEmpty }())
-            #expect({ account.collectStaff(for: .cornerMarket) == 90 }())
+            #expect({ account.collectStaff(for: .cornerMarket) == 0 }())
             #expect(account.isValid)
             #expect({ account.advanceStaff(by: 28_800).isEmpty }())
         }
@@ -233,14 +234,17 @@ import Testing
     @Test func alreadyPackedPayIsPreservedWhenEquipmentChanges() {
         var account = funded()
         #expect({ account.hireWorker(for: .cornerMarket) }())
-        _ = account.advanceStaff(by: 120)
+        account.teams[.cornerMarket]?.pendingOrders = 1
+        account.teams[.cornerMarket]?.pendingCash = 45
         #expect(account.teams[.cornerMarket]?.pendingCash == 45)
         #expect({ account.buy(.labels) }())
         #expect(account.workerPayout(for: .cornerMarket) == 48)
         #expect(account.teams[.cornerMarket]?.pendingCash == 45)
-        _ = account.advanceStaff(by: 120)
-        #expect(account.teams[.cornerMarket]?.pendingCash == 93)
-        #expect({ account.collectStaff(for: .cornerMarket) == 93 }())
+        let report = account.advanceStaff(by: 120)
+        #expect(report.earned == 93)
+        #expect(report.packedOrders == 2)
+        #expect(account.teams[.cornerMarket]?.pendingCash == 0)
+        #expect({ account.collectStaff(for: .cornerMarket) == 0 }())
         #expect(account.automatedOrders == 2)
     }
 
@@ -251,7 +255,65 @@ import Testing
         let restored = try JSONDecoder().decode(TycoonAccount.self, from: JSONEncoder().encode(account))
         #expect(restored == account)
         #expect(restored.isValid)
-        #expect(restored.teams[.artStudio]?.pendingOrders == 1)
+        #expect(restored.teams[.artStudio]?.pendingOrders == 0)
+        #expect(restored.automatedOrders == 1)
         #expect(restored.teams[.artStudio]?.progressSeconds == 1)
+    }
+
+    @Test func ownedManagersIncreaseSpeedAndRoundedWorkerPayout() {
+        var account = funded()
+        account.teams[.cornerMarket] = TycoonTeam(workers: 1)
+        let interval = account.workerInterval(for: .cornerMarket)
+        let pay = account.workerPayout(for: .cornerMarket)
+        account.teams[.cornerMarket]?.hasManager = true
+        #expect(account.workerInterval(for: .cornerMarket) == interval / 1.25)
+        #expect(account.workerPayout(for: .cornerMarket) == pay * 125 / 100)
+        let report = account.advanceStaff(by: 28_800)
+        #expect(report.packedOrders == 300)
+        #expect(report.earned == 300 * 56)
+        #expect(account.isValid)
+        for upgrade in DepotUpgrade.allCases { account.levels[upgrade] = DepotUpgrade.maxLevel }
+        let maximumPay = account.workerPayout(for: .cornerMarket)
+        account.teams[.cornerMarket]?.pendingOrders = 3
+        account.teams[.cornerMarket]?.pendingCash = maximumPay * 3
+        #expect(account.isValid)
+        #expect({ account.settlePendingStaff().earned == maximumPay * 3 }())
+    }
+
+    @Test func legacyPendingIsBankedExactlyOnceWithoutElapsedOrManualSequenceChanges() throws {
+        var account = funded()
+        account.teams[.cornerMarket] = TycoonTeam(workers: 1, pendingCash: 135, pendingOrders: 3)
+        account.teams[.bookshop] = TycoonTeam(workers: 1, pendingCash: 124, pendingOrders: 2)
+        let cash = account.cash
+        let receipt = account.lastDelivery
+        let active = try #require(account.offers.first)
+        let report = account.settlePendingStaff()
+        #expect(report.earned == 259)
+        #expect(report.packedOrders == 5)
+        #expect(account.cash == cash + 259)
+        #expect(account.automatedOrders == 5)
+        #expect(account.completedOrders == 1_000)
+        #expect(account.lastDelivery == receipt)
+        #expect(account.accepts(active))
+        #expect({ account.settlePendingStaff().isEmpty }())
+        #expect({ account.advanceStaff(by: 0).isEmpty }())
+        let next = account.advanceStaff(by: 120)
+        #expect(next.earned == 107)
+        #expect(next.packedOrders == 2)
+        #expect(account.automatedOrders == 7)
+        #expect(account.isValid)
+    }
+
+    @Test func zeroElapsedFlushesLegacyPendingAndPreservesPartialPackingProgress() {
+        var account = funded()
+        account.teams[.cornerMarket] = TycoonTeam(workers: 1, pendingCash: 90, pendingOrders: 2, progressSeconds: 75)
+        let report = account.advanceStaff(by: 0)
+        #expect(report.earned == 90)
+        #expect(report.packedOrders == 2)
+        #expect(account.teams[.cornerMarket]?.progressSeconds == 75)
+        #expect(account.teams[.cornerMarket]?.pendingOrders == 0)
+        #expect({ account.advanceStaff(by: 44).isEmpty }())
+        #expect({ account.advanceStaff(by: 1).packedOrders == 1 }())
+        #expect(account.automatedOrders == 3)
     }
 }

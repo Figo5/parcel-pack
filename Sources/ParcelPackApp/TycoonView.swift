@@ -511,7 +511,7 @@ struct TycoonView: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("A little help with the boxes").font(.title2.bold())
-                Text("Hire a team for each customer. Workers pack up to three orders, then wait for you to collect. A manager keeps shipments moving automatically.")
+                Text("Hire a team for each customer. Workers pack, ship and put the earnings straight into your cash. Managers make their team faster and more profitable.")
                     .font(.subheadline).foregroundStyle(Palette.muted)
                 Label("Works while you're away · up to 8 hours", systemImage: "moon.zzz")
                     .font(.caption.weight(.medium)).foregroundStyle(Palette.accent)
@@ -542,11 +542,8 @@ struct TycoonView: View {
         let team = model.account.teams[customer]
         let workers = team?.workers ?? 0
         let managed = team?.hasManager ?? false
-        let pending = team?.pendingOrders ?? 0
-        let pendingCash = team?.pendingCash ?? 0
         let interval = model.account.workerInterval(for: customer)
         let progress = min(interval, max(0, team?.progressSeconds ?? 0))
-        let waiting = !managed && pending >= 3
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Image(systemName: unlocked ? symbol(for: customer) : "lock")
@@ -573,24 +570,17 @@ struct TycoonView: View {
                 }
                 .font(.caption.weight(.medium)).foregroundStyle(Palette.muted)
                 if workers > 0 {
-                    ProgressView(value: waiting ? 1 : progress / max(interval, 1), total: 1)
-                        .tint(waiting ? Palette.stamp : Palette.accent)
+                    ProgressView(value: progress / max(interval, 1), total: 1)
+                        .tint(Palette.accent)
                         .accessibilityLabel("\(customer.title) packing progress")
-                        .accessibilityValue(waiting ? "Storage full. Collect three orders to continue." : "\(Int(progress / max(interval, 1) * 100)) percent")
+                        .accessibilityValue("\(Int(progress / max(interval, 1) * 100)) percent")
                     HStack {
-                        Text(managed ? "Auto-shipping to your cash" : waiting ? "Storage full · collect to keep packing" : "\(pending)/3 orders waiting")
-                            .font(.caption).foregroundStyle(waiting ? Palette.stamp : Palette.muted)
+                        Label("Auto-shipping to cash", systemImage: "checkmark.circle")
+                            .font(.caption.weight(.medium)).foregroundStyle(Palette.accent)
                         Spacer(minLength: 4)
-                        if !managed {
-                            Button {
-                                performStaffAction(for: customer) { model.collectStaff(for: customer) }
-                            } label: {
-                                Text("Collect \(money(pendingCash))")
-                            }
-                            .buttonStyle(PillButtonStyle(filled: pendingCash > 0))
-                            .frame(maxWidth: 160)
-                            .disabled(pendingCash <= 0)
-                            .accessibilityLabel("Collect \(pending) \(customer.title) orders for \(money(pendingCash))")
+                        if managed {
+                            Text("+25% speed & pay")
+                                .font(.caption2.weight(.medium)).foregroundStyle(Palette.muted)
                         }
                     }
                 }
@@ -613,6 +603,7 @@ struct TycoonView: View {
                         Label("Managed", systemImage: "checkmark.seal")
                             .font(.caption.weight(.semibold)).foregroundStyle(Palette.accent)
                             .frame(maxWidth: .infinity, minHeight: 44)
+                            .accessibilityLabel("Manager hired. Packing is 25 percent faster and earnings are 25 percent greater.")
                     } else if let cost = model.account.managerCost(for: customer) {
                         Button {
                             performStaffAction(for: customer, announce: false) { model.hireManager(for: customer) }
@@ -620,7 +611,7 @@ struct TycoonView: View {
                             .buttonStyle(PillButtonStyle())
                             .disabled(!model.account.canHireManager(for: customer))
                             .accessibilityLabel("Hire manager for \(customer.title), \(money(cost))")
-                            .accessibilityHint("Automatically ships this team's orders. Hire a worker first.")
+                            .accessibilityHint("Makes packing 25 percent faster and increases earnings by 25 percent. Hire a worker first.")
                     }
                 }
                 if workers == 0 {
@@ -654,13 +645,13 @@ struct TycoonView: View {
     private func hireRequirement(for customer: TycoonCustomer) -> String {
         guard let cost = model.account.workerCost(for: customer) else { return "Your team is fully staffed." }
         if cost > model.account.cash { return "Save \(money(cost - model.account.cash)) more to hire. A manager needs a worker first." }
-        return "Your first worker starts packing straight away."
+        return "Your first worker starts packing and earning straight away."
     }
 
     private func managerRequirement(for customer: TycoonCustomer) -> String {
-        guard let cost = model.account.managerCost(for: customer) else { return "Orders ship automatically." }
-        if cost > model.account.cash { return "Save \(money(cost - model.account.cash)) more for automatic shipping." }
-        return "Hire a manager to remove the three-order storage limit."
+        guard let cost = model.account.managerCost(for: customer) else { return "Your manager boosts speed and earnings by 25%." }
+        if cost > model.account.cash { return "Save \(money(cost - model.account.cash)) more for a manager's 25% speed and pay boost." }
+        return "A manager boosts this team's speed and earnings by 25%."
     }
 
     private func customerUnlockRequirement(_ customer: TycoonCustomer) -> String {
@@ -673,27 +664,51 @@ struct TycoonView: View {
 
     // MARK: Depot
 
+    private var workerCount: Int { model.account.teams.values.reduce(0) { $0 + $1.workers } }
+    private var managerCount: Int { model.account.teams.values.filter(\.hasManager).count }
+    private var incomePerMinute: Double {
+        TycoonAccount.automatableCustomers.reduce(0) { total, customer in
+            let interval = model.account.workerInterval(for: customer)
+            guard interval > 0 else { return total }
+            return total + Double(model.account.workerPayout(for: customer)) * 60 / interval
+        }
+    }
+    private var workforceDescription: String {
+        "\(workerCount) \(workerCount == 1 ? "worker" : "workers") · \(managerCount) \(managerCount == 1 ? "manager" : "managers")"
+    }
+    private var incomePace: String {
+        "$\(incomePerMinute.formatted(.number.precision(.fractionLength(0...1))))/min"
+    }
+
     private var depotContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Your little shipping empire").font(.title2.bold())
+                Text(model.account.stage.title).font(.title2.bold())
                 Text(model.account.stage.detail).font(.subheadline).foregroundStyle(Palette.muted)
             }
             DepotScene(account: model.account)
-                .padding(.horizontal, -8)
+                .padding(.horizontal, -12)
             Button { tab = .crew } label: {
-                HStack {
-                    Label("\(model.account.teams.values.reduce(0) { $0 + $1.workers }) workers", systemImage: "person.2")
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(workerCount == 0 ? "Room for a crew" : workforceDescription)
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.ink)
+                        Text(workerCount == 0 ? "Hire your first worker in Crew" : "Your team ships and banks every order")
+                            .font(.caption).foregroundStyle(Palette.muted)
+                    }
                     Spacer(minLength: 8)
-                    Text("Visit Crew")
-                    Image(systemName: "arrow.right")
+                    if workerCount > 0 {
+                        Text(incomePace).font(.headline).monospacedDigit().foregroundStyle(Palette.accent)
+                    }
+                    Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(Palette.accent)
                 }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Palette.accent)
+                .padding(.vertical, 12)
                 .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Visit Crew. \(model.account.teams.values.reduce(0) { $0 + $1.workers }) workers in your depot.")
+            .accessibilityLabel(workerCount == 0 ? "Hire your first worker in Crew" : "\(workforceDescription). Estimated staff income \(incomePace). Visit Crew.")
+            .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid.opacity(0.65)).frame(height: 1) }
             stageTrail
             expansion
             HStack {
@@ -1003,8 +1018,8 @@ private struct TycoonHelpSheet: View {
                 }
                 Section("Build a crew") {
                     Label("The first six customers can each have up to 20 workers. More workers make that team pack faster.", systemImage: "person.2")
-                    Label("A team stores three orders, then pauses. Collect them in Crew to ship the boxes and bank the cash.", systemImage: "tray.and.arrow.down")
-                    Label("Hire a manager after your first worker to ship that customer's orders automatically and remove the storage limit.", systemImage: "person.crop.circle.badge.checkmark")
+                    Label("Every worker automatically packs and ships orders. Earnings go straight into your cash.", systemImage: "tray.and.arrow.down")
+                    Label("Hire a manager after your first worker to make that team pack 25% faster and earn 25% more per order.", systemImage: "person.crop.circle.badge.checkmark")
                     Label("Staff keep working while the app is closed, for up to eight hours between visits. Your own packing order stays saved.", systemImage: "moon.zzz")
                 }
                 Section("Take your time") {

@@ -101,32 +101,45 @@ extension TycoonAccount {
         guard customer.canAutomate, let team = teams[customer], team.isValid, team.workers > 0,
               (0...DepotUpgrade.maxLevel).contains(level(.conveyor)) else { return 0 }
         return 120 / (1 + 0.15 * Double(team.workers - 1)) / (1 + 0.05 * Double(level(.conveyor)))
+            / (team.hasManager ? 1.25 : 1)
     }
 
     public func workerPayout(for customer: TycoonCustomer) -> Int {
         guard customer.canAutomate, levels.values.allSatisfy({ (0...DepotUpgrade.maxLevel).contains($0) }) else { return 0 }
         let equipment = customer.basePay + 8 * level(.workbench) + 4 * level(.shelves) + 6 * level(.labels)
-        return equipment * (100 + 10 * level(.van)) * (100 + 5 * level(.dispatchDesk)) / 20_000
+        let payout = equipment * (100 + 10 * level(.van)) * (100 + 5 * level(.dispatchDesk)) / 20_000
+        return teams[customer]?.hasManager == true ? payout * 125 / 100 : payout
     }
 
     static func maximumWorkerPayout(for customer: TycoonCustomer) -> Int {
-        (customer.basePay + 18 * DepotUpgrade.maxLevel) * (100 + 10 * DepotUpgrade.maxLevel)
+        let payout = (customer.basePay + 18 * DepotUpgrade.maxLevel) * (100 + 10 * DepotUpgrade.maxLevel)
             * (100 + 5 * DepotUpgrade.maxLevel) / 20_000
+        return payout * 125 / 100
     }
 
-    /// Packed orders may wait on an unmanaged team's shelf; earned cash is money already banked.
-    @discardableResult public mutating func advanceStaff(by elapsed: TimeInterval) -> StaffReport {
-        guard isValid, elapsed.isFinite, elapsed > 0 else { return StaffReport() }
-        let elapsed = min(elapsed, 8 * 60 * 60)
+    /// Settle shelves saved by earlier versions without changing a manual order's sequence.
+    @discardableResult public mutating func settlePendingStaff() -> StaffReport {
+        guard isValid else { return StaffReport() }
         var report = StaffReport()
         for customer in Self.automatableCustomers {
-            guard let existing = teams[customer], existing.workers > 0 else { continue }
-            if existing.hasManager { report.earned += collectStaff(for: customer) }
-            guard var team = teams[customer] else { continue }
-            if !team.hasManager && team.pendingOrders == TycoonTeam.storageCapacity {
-                team.progressSeconds = 0; teams[customer] = team
-                continue
+            guard let team = teams[customer], team.pendingOrders > 0 else { continue }
+            let collected = collectStaff(for: customer)
+            if collected > 0 {
+                report.earned += collected
+                report.packedOrders += team.pendingOrders
             }
+        }
+        return report
+    }
+
+    /// Every worker team ships completed boxes directly; managers improve its speed and pay.
+    @discardableResult public mutating func advanceStaff(by elapsed: TimeInterval) -> StaffReport {
+        guard isValid, elapsed.isFinite, elapsed >= 0 else { return StaffReport() }
+        var report = settlePendingStaff()
+        guard elapsed > 0 else { return report }
+        let elapsed = min(elapsed, 8 * 60 * 60)
+        for customer in Self.automatableCustomers {
+            guard var team = teams[customer], team.workers > 0 else { continue }
             let interval = workerInterval(for: customer)
             let payout = workerPayout(for: customer)
             guard interval > 0, payout > 0 else { continue }
@@ -136,20 +149,15 @@ extension TycoonAccount {
             let pendingOrders = teams.values.reduce(0) { $0 + $1.pendingOrders }
             let moneyCapacity = max(0, min(TycoonLimits.money - cash, TycoonLimits.money - totalEarned) - pendingCash) / payout
             let counterCapacity = max(0, TycoonLimits.automatedOrders - automatedOrders - pendingOrders)
-            let shelfCapacity = team.hasManager ? possible : TycoonTeam.storageCapacity - team.pendingOrders
-            let produced = min(min(possible, shelfCapacity), min(moneyCapacity, counterCapacity))
-            // Time while a shelf or business limit is full is not queued as future work.
-            if produced < possible || (!team.hasManager && team.pendingOrders + produced == TycoonTeam.storageCapacity) {
+            let produced = min(possible, min(moneyCapacity, counterCapacity))
+            // Time while a business limit is full is not queued as future work.
+            if produced < possible {
                 team.progressSeconds = 0
             } else {
                 team.progressSeconds = max(0, progress - Double(produced) * interval)
             }
-            if team.hasManager {
-                cash += produced * payout; totalEarned += produced * payout; automatedOrders += produced
-                report.earned += produced * payout
-            } else {
-                team.pendingCash += produced * payout; team.pendingOrders += produced
-            }
+            cash += produced * payout; totalEarned += produced * payout; automatedOrders += produced
+            report.earned += produced * payout
             report.packedOrders += produced
             teams[customer] = team
         }

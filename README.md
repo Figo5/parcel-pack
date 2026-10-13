@@ -6,7 +6,7 @@ A native SwiftUI packing game for iPhone and Mac. Build a shipping business in *
 
 Fill a customer box and **Ship** it for cash. Free hints help finish tricky boxes; packing without hints adds a bonus worth 20% of the customer's base pay. Choose a store in **Orders** and keep packing for that store until you select another. Your current customer and partially packed box survive relaunch.
 
-Eight customers unlock through deliveries and depot growth. Grow from **Spare room** through **Shopfront**, **Local depot**, and **Warehouse** to a **Shipping hub**. Both your manual shipments and collected staff deliveries count toward these milestones.
+Eight customers unlock through deliveries and depot growth. Grow from **Spare room** through **Shopfront**, **Local depot**, and **Warehouse** to a **Shipping hub**. Both your manual shipments and automatic staff deliveries count toward these milestones.
 
 ### Equipment and crew
 
@@ -21,9 +21,9 @@ Six equipment lines each have 30 levels:
 | Conveyor belt | Faster worker packing |
 | Dispatch desk | +5% worker payout |
 
-In **Crew**, hire teams for the first six stores. Each team supports up to 20 workers. Workers pack orders into a three-order holding area; tap **Collect** to ship them for cash. A manager ships automatically, including up to eight hours of elapsed work while the app is closed. Worker shipments start at half the base/equipment payout and benefit from the van and dispatch desk; they do not receive the manual clean-pack bonus.
+In **Crew**, hire teams for the first six stores. Each team supports up to 20 workers. Every hired team packs continuously and sends earnings straight to your cash balance, including up to eight hours of work while the app is closed. No collection taps or holding-area limit. Managers add **25% packing speed and 25% earnings**. Worker shipments start at half the base/equipment payout and benefit from the van and dispatch desk; they do not receive the manual clean-pack bonus.
 
-The depot scene reflects your equipment, workers, managers, and building. Cash, equipment, staff, active order, paid receipt, and production timestamp save together. Reopening a paid box or collecting elapsed production twice cannot pay again. Version 1.1 businesses migrate without resetting cash, purchased equipment, building, or the chosen customer.
+The depot scene reflects your equipment, workers, managers, and building, with marked work areas, richer storage and loading details, and a live staff income summary. Cash, equipment, staff, active order, paid receipt, and production timestamp save together. Reopening a paid box or restoring elapsed production twice cannot pay again. Existing businesses migrate without resetting cash, equipment, building, or the chosen customer; orders waiting in older saves are credited automatically once.
 
 ## Endless Free play
 
