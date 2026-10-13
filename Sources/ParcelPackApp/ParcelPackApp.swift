@@ -5,13 +5,12 @@ import ParcelCore
 
 @main
 struct ParcelPackApp: App {
-    @State private var endlessModel = EndlessModel()
     @State private var tycoonModel = TycoonModel()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
-            RootView(endless: endlessModel, tycoon: tycoonModel)
+            RootView(tycoon: tycoonModel)
                 #if os(macOS)
                 .frame(minWidth: 375, idealWidth: 430, minHeight: 700, idealHeight: 850)
                 #endif
@@ -23,7 +22,6 @@ struct ParcelPackApp: App {
         #endif
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
-                endlessModel.save()
                 tycoonModel.save()
             }
         }

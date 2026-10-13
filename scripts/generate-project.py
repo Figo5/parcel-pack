@@ -55,7 +55,7 @@ for mode in ("Debug", "Release"):
     settings = {
         "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
         "CODE_SIGN_STYLE": "Automatic",
-        "CURRENT_PROJECT_VERSION": "4",
+        "CURRENT_PROJECT_VERSION": "5",
         "DEVELOPMENT_TEAM": "",
         "GENERATE_INFOPLIST_FILE": "YES",
         "INFOPLIST_KEY_CFBundleDisplayName": "Parcel Pack",
@@ -64,7 +64,7 @@ for mode in ("Debug", "Release"):
         "INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents": "YES",
         "INFOPLIST_KEY_UILaunchScreen_Generation": "YES",
         "INFOPLIST_KEY_UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait",
-        "MARKETING_VERSION": "1.3",
+        "MARKETING_VERSION": "2.0",
         "PRODUCT_BUNDLE_IDENTIFIER": "com.giofiore.parcelpack",
         "PRODUCT_NAME": "$(TARGET_NAME)",
         "SUPPORTED_PLATFORMS": "iphoneos iphonesimulator",

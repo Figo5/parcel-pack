@@ -1,7 +1,7 @@
 import Foundation
 
 public struct SavedTycoon: Codable, Equatable, Sendable {
-    public var version: Int = 2
+    public var version: Int = 3
     public var account: TycoonAccount
     public var session: TycoonSession?
     public var staffUpdatedAt: Date?
@@ -31,7 +31,7 @@ public struct SavedTycoon: Codable, Equatable, Sendable {
     }
 
     public var isValid: Bool {
-        (1...2).contains(version) && account.isValid && (session.map(accepts) ?? true)
+        (1...3).contains(version) && account.isValid && (session.map(accepts) ?? true)
             && (staffUpdatedAt.map(Self.validDate) ?? true)
     }
 
@@ -50,7 +50,7 @@ public struct TycoonStore {
     public func load() -> SavedTycoon? {
         guard let data = defaults.data(forKey: Self.key), data.count <= 128_000,
               var saved = try? JSONDecoder().decode(SavedTycoon.self, from: data),
-              (1...2).contains(saved.version), saved.account.isValid else { return nil }
+              (1...3).contains(saved.version), saved.account.isValid else { return nil }
         if let session = saved.session, !saved.accepts(session) { saved.session = nil }
         if let date = saved.staffUpdatedAt, !SavedTycoon.validDate(date) { saved.staffUpdatedAt = nil }
         return saved

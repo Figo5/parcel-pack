@@ -1,55 +1,38 @@
 # Parcel Pack validation
 
-Date: October 13, 2026 (America/New_York). Current version: **1.3, build 4**.
+Date: October 13, 2026 (America/New_York). Current update: **2.0, build 5**.
 
-## Builds and tests
+## Builds and automated checks
 
-- **99 Swift tests pass**: 67 core tests in nine suites, 32 app-model tests in six suites. Swift 6.4, Xcode 27.0 (27A266a).
-- Native Mac release packaging succeeds. The build script uses SwiftPM's actual binary path rather than copying an earlier binary.
-- The shared Xcode scheme builds successfully for generic iOS Simulator with signing disabled and for a signed generic iOS device. iOS deployment target remains 17.0. All 20 shared Swift source files compile.
-- `codesign --verify --deep --strict` passes for the signed iPhone artifact. Device Control installed and launched version 1.3/build 4 on the user's iPhone 15 running iOS 26.7.1; a filtered app listing confirms both numbers.
-- Personal signing settings remain local. The canonical Git project leaves the development team empty; regeneration retains the local team.
+- The full Swift suite passes: **121 tests**, comprising 81 core tests in ten suites and 40 app-model tests in seven suites. Swift 6.4, Xcode 27.0 (27A266a).
+- Native Mac release packaging, generic iOS Simulator, and signed generic iOS builds compile all 22 shared source files. The simulator target builds without signing. Deployment target remains iOS 17.0; no external dependencies were added.
+- Strict/deep codesign verification passes for the signed artifact. Device Control installed version 2.0/build 5 on the physical iPhone 15 and a filtered app listing confirms both numbers. Launch was blocked by the phone locking again; physical runtime checks remain.
+- Personal signing remains local; the canonical Git project leaves the team empty and regeneration retains the local choice. Branch backup is `claude/optimistic-johnson-nmx2si`; Main is unchanged.
 
-## Tycoon and staff
+## New progression coverage
 
-- Deterministic exact-fill orders cover all eight customers with fixed orientations. Shipping pays only a complete current order and cannot repay its receipt. Hints remove only the clean bonus. Purchases cannot overdraw cash and preserve the current box and historical receipt.
-- Two 250-shipment simulations, one clean and one hinted, reach all five depot stages and all eight clients under the actual rules.
-- Six equipment lines now support 30 levels; new label, conveyor, and dispatch effects are checked with the existing workbench/shelf/van effects.
-- Fifteen staff tests cover worker costs/caps, unlocked customer requirements, continuous automatic payouts for teams without managers, fractional progress, eight-hour catchup, manager speed/pay bonuses, legacy pending settlement, safe business limits, and invalid/nonfinite elapsed time. A 100-order unmanaged production sample confirms the old three-order bottleneck is gone.
-- Pending staff revenue reserves money and counter headroom. Manual payments cannot consume that reserved capacity. Invalid teams, money, counters, order seeds, and receipt history are rejected.
-- Automatic deliveries never change the manual order sequence or last manual receipt. Staff deliveries count toward client unlocks and expansion requirements. Managers divide the packing interval by 1.25 and add 25% to the rounded worker payout; validation bounds include this bonus.
-- Version 1 JSON with no staff fields retains the original cash, building, equipment, current customer, and box. Missing new equipment keys read as level 0. Broken nested boards retain a valid business within the 128 KB save limit.
-- Model regression tests keep Circuit Supply selected over shipping, next order, and relaunch. Staff time settles at prior equipment levels before purchases. Income and its production timestamp save together, so relaunch cannot repeat catchup. A backward clock change and return to the prior timestamp produce no duplicate work, including the following half-interval.
-- A saved unmanaged team with two waiting orders credits their historical payout on launch even with zero elapsed time. Relaunch cannot pay again, and the manual receipt and active box remain unchanged.
-- Independent integration review found and resolved the clock-watermark issue and occupied bounding-box anchor issue for fixed shapes with an empty top-left corner.
+- Thirteen progression tests cover deterministic contract variants and validated acceptance, once-only automatic supply rewards, premium manual-only progress, blueprint and finite dispatch rewards, bounded relationships and prior-rank pay, chronological production equivalence, exact 120-second worker and 60-second branch completion boundaries, real milestone/specialty effects, all district branches/customers, voluntary franchise reset, Head Office/star/starter-grant rules, money reservations/limits, and migration.
+- Initial one-customer offers provide distinct shorter Special delivery and longer Gift collection jobs. Accepted longer jobs survive reload and complete under their canonical reward rules. Expanding to Shipping hub while a premium third-slot contract is active preserves the accepted job instead of replacing it with a landmark.
+- A three-team two-hour batch agrees with 7,200 one-second foreground ticks for revenue, actual shipments, trust thresholds, boost exhaustion, contract progress, and completion payment. Branches run alongside the main business and never fabricate customer XP.
+- Automated and manual shipments reserve active contract rewards and historic waiting cash within money/counter bounds. Contract payment and progression happen in the same account mutation; a completed job cannot be accepted or paid again.
+- Franchising requires Shipping hub and a completed landmark. Purchases do not reduce the star reward. Reset uses a fresh seed, clears run state, preserves trust/blueprints/stars/Head Office/lifetime records, and explicitly supports starter cash and workers. Established Business can be purchased immediately after reset, and an earned starter package supports equipment purchases before the first manual shipment.
+- Eight new app-model tests verify acceptance retains a partial box; premium completion/relaunch pays once and retains the receipt; franchise preview cancellation preserves the box; confirmation atomically saves the new account, order and clock; immediate permanent purchases persist; specialties settle prior-rate work; a branch-only business earns without workers while visits retain the box; locked reset is rejected; and historical Free Play saves remain untouched.
 
-## Endless Free play
+## Saves and retained regressions
 
-- 19 focused core/store/model tests cover generated fixed pieces, invalid placements without mutation, row and column clears, crossing lines counted once, tray refill after all three pieces, deterministic RNG continuation, score/counter accounting, and game-over legal-fit detection.
-- Save checks retain the active board, tray, score, RNG, and best score. A malformed active run preserves a valid best. New game keeps the record and requires confirmation for a live run.
-- Hint highlights a legal placement without awarding points or placing a piece. Occupied bounding-box anchors remain tappable when a shape's actual footprint fits around them.
-- Shift is absent from the mode picker and app lifecycle. Previous Shift and exact-fill Free pack saves remain untouched; the endless run uses its own save key.
+- Save schema 3 accepts versions 1...3 under the existing 128 KB bound. Old cash, equipment, crew, current customer, partial box, receipt and production watermark survive missing new fields. Lifetime totals seed from existing aggregate counters; historical per-store XP is not invented.
+- Individual malformed optional progression values are repaired. A full Harbor business with workers, specialties and a partially packed Harbor order retains its healthy state when a boost is negative/wrong-typed or active contract metadata has an invalid round/reward. Entirely unreadable modern progression is conservatively rejected rather than inventing neighborhood ownership.
+- Staff timestamps and income save together. Clock rollback/relaunch does not duplicate work. Historical waiting orders pay their saved rate once, even at zero elapsed time; they do not alter manual order sequence or historical receipt.
+- Existing generated packing, sticky-customer, upgrade purchasing, expansion reachability, receipt replay, hint, orientation, bounds, save-repair, and legacy Shift/Free pack/Endless tests remain. All parcels stay fixed in orientation. No Free Play or Shift model is created or saved by the playable app lifecycle.
 
-## Version 1.3 native play checks
+## Native play and layout checks
 
-- The Mac 375-point layout restores the existing Shopfront, purchased equipment, paid Circuit Supply order, worker, and manager. Crew has no collection controls, and displays the manager's new $65 payout and 92-second interval.
-- Hired an unmanaged Chapter & Co. worker through the native interface for $750. It shows $69 per order, a 115-second interval, and automatic shipping. Both teams' progress indicators advance in the final build. Without collection or another gameplay action, Corner Market banks $65 and Chapter & Co. banks $69, updating cash and staff delivery counts. Relaunch credits elapsed work while retaining the paid Circuit Supply box and customer.
-- The depot renders separate storage, packing, and outbound areas, owned equipment, and hired staff. The workforce link has correct singular/plural labels and an income estimate derived from each team's actual payout and interval.
-- The final iPhone 18 Pro simulator build renders the Spare room depot in portrait with readable signage, expansion requirements, safe areas, and four bottom tabs. Existing cash and paid manual order remain intact.
-- The final version 1.3/build 4 is installed and launched on the physical iPhone 15. Physical finger, enlarged-text, audio, haptic, and VoiceOver checks remain. No IPA export, TestFlight upload, or App Store release has been made.
+- Updated Mac app restores the existing Shopfront, purchased equipment, managed Corner Market team, unmanaged Chapter & Co. team, $9,441 cash, and paid Circuit Supply order 20. Free Play and the mode picker are absent; all five Tycoon tabs are present.
+- Accepted a premium Chapter & Co. job through Orders without replacing the paid Circuit box. Its separate Pack action selected Chapter & Co. Played and shipped three hinted boxes; progress advanced 1/3 and 2/3, then the $1,500 contract bonus banked automatically. The saved account shows one permanent blueprint and stored dispatch charges, with crew consumption continuing independently. Subsequent orders retained Chapter & Co.
+- Bought Workbench levels 2/3/4/5 for $480/$1,080/$1,920/$3,000. Cash deducted the actual $6,480 total; level 5 displays Twin packing bench, +10% milestone manual pay, and the next transformation at level 10. Equipment and branch income displays use actual saved state/rates.
+- Mac Orders/World/Depot render readable contract choices, trust, district requirements, current income, equipment progression and Head Office/franchise requirements at 375-point width. A compact Pack refinement preserves at least 44-point board cells while reducing space above the tray in short windows.
+- The final compact Mac build restores the Chapter & Co. receipt, blueprint, trust rank 1 and milestone equipment without repaying the job. Its next supply contract accepts safely; Pack for that customer opens the next saved-sequence box with a visible parcel tray and compact contract/boost strip.
+- iPhone 18 Pro simulator portrait shows active packing, parcel tray/actions, the contract board, safe areas and five bottom tabs. It retains earlier simulator cash and box. Endgame branch/prestige behavior is verified by model/core tests and independent source review; a complete endgame native playthrough has not been performed.
+- Further physical finger, enlarged-text, VoiceOver, haptic and audio checks remain. No TestFlight, IPA export or App Store release has been performed.
 
-## Earlier version 1.2 native play checks
-
-- The Mac 375-point layout restores the pre-update Shopfront, $40 cash, workbench level 1, and paid bookshop box. Crew, customer catalog, all six upgrade rows, and Free play render without clipped controls; the wallet remains visible while depot content scrolls.
-- Played eleven consecutive Little Leaf orders and two Circuit Supply orders through the native interface. Next order retained the customer each time, and the Circuit Supply label and payment stayed selected.
-- Hired a Corner Market worker for $540 and its manager for $1,350. Observed progress advancing, automatic $49 revenue, and total delivery progress increasing independently of the manual order sequence.
-- Bought the label printer for $140 and conveyor for $225. The account deducted the prices after settling older worker pay, and the scene and staff statistics reflected the new equipment. The depot draws the hired worker and manager.
-- In Mac Free play, placed all three initial pieces, scored 90, and observed a new tray. New game requested confirmation; cancelling and relaunching retained score 90, the board, tray, and record.
-- The iPhone 18 Pro simulator shows both modes in portrait with safe areas, the four Tycoon tabs, full 8×8 board, and visible tray/actions. Tap placement scored 40; dragging the second fixed shape scored another 30.
-- Version 1.2/build 3 is installed and launched on the physical iPhone 15. Further physical finger, enlarged-text, audio, haptic, and VoiceOver checks remain. No IPA export, TestFlight upload, or App Store release has been made.
-
-## Retained regression coverage
-
-Legacy Shift tests still verify fixed-orientation generated plans, required parcels, shelf carryover, rush fees, best-full-box scoring, saved outcomes, overflow bounds, and old save migration. Original Free pack tests cover exact fills, hints, blocked-hint recovery, bounds/overlap, lifetime counts, and legacy orientation migration. These support shared packing helpers and preserved historical data; those modes are no longer selectable.
-
-Work is backed up on `claude/optimistic-johnson-nmx2si`. Main is unchanged. Build products and orchestration logs remain ignored.
+Build products and orchestration logs remain ignored. See AFTER_UPDATE.md for the verified physical-device version and installation status.

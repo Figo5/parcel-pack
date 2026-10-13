@@ -52,9 +52,12 @@ import Testing
         let pay = account.workerPayout(for: .cornerMarket)
         #expect(interval == 120)
         #expect(pay == 45)
+        var reference = account
+        var expected = 0
+        for _ in 0..<100 { expected += reference.advanceStaff(by: interval).earned }
         let first = account.advanceStaff(by: interval * 100)
         #expect(first.packedOrders == 100)
-        #expect(first.earned == pay * 100)
+        #expect(first.earned == expected)
         #expect(account.teams[.cornerMarket]?.pendingOrders == 0)
         #expect(account.teams[.cornerMarket]?.pendingCash == 0)
         #expect(account.cash == cash + first.earned)
@@ -268,9 +271,12 @@ import Testing
         account.teams[.cornerMarket]?.hasManager = true
         #expect(account.workerInterval(for: .cornerMarket) == interval / 1.25)
         #expect(account.workerPayout(for: .cornerMarket) == pay * 125 / 100)
+        var reference = account
+        var expected = 0
+        for _ in 0..<300 { expected += reference.advanceStaff(by: 96).earned }
         let report = account.advanceStaff(by: 28_800)
         #expect(report.packedOrders == 300)
-        #expect(report.earned == 300 * 56)
+        #expect(report.earned == expected)
         #expect(account.isValid)
         for upgrade in DepotUpgrade.allCases { account.levels[upgrade] = DepotUpgrade.maxLevel }
         let maximumPay = account.workerPayout(for: .cornerMarket)

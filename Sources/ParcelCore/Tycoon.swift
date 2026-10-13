@@ -53,6 +53,7 @@ public enum DepotUpgrade: String, CaseIterable, Codable, Sendable {
 
 public enum TycoonCustomer: String, CaseIterable, Codable, Sendable {
     case cornerMarket, bookshop, plantShop, gadgetShop, homeGoods, artStudio, arcadeWorkshop, makerCollective
+    case harborOutfitters, galleryStore, uptownBoutique
 
     public var title: String {
         switch self {
@@ -64,6 +65,9 @@ public enum TycoonCustomer: String, CaseIterable, Codable, Sendable {
         case .artStudio: "Color House"
         case .arcadeWorkshop: "Replay Workshop"
         case .makerCollective: "Maker Collective"
+        case .harborOutfitters: "Harbor Outfitters"
+        case .galleryStore: "Gallery Store"
+        case .uptownBoutique: "Uptown Boutique"
         }
     }
 
@@ -77,6 +81,9 @@ public enum TycoonCustomer: String, CaseIterable, Codable, Sendable {
         case .artStudio: "Art supplies for the city's creative studios."
         case .arcadeWorkshop: "Parts and collectibles from the arcade workshop."
         case .makerCollective: "Large orders from a whole community of makers."
+        case .harborOutfitters: "Outdoor goods and supplies for waterfront adventures."
+        case .galleryStore: "Gallery pieces and carefully packed creative collections."
+        case .uptownBoutique: "Premium goods bound for the city's finest shops."
         }
     }
 
@@ -84,7 +91,7 @@ public enum TycoonCustomer: String, CaseIterable, Codable, Sendable {
         switch self {
         case .cornerMarket, .bookshop: .small
         case .plantShop, .gadgetShop, .homeGoods: .medium
-        case .artStudio, .arcadeWorkshop, .makerCollective: .large
+        case .artStudio, .arcadeWorkshop, .makerCollective, .harborOutfitters, .galleryStore, .uptownBoutique: .large
         }
     }
 
@@ -98,6 +105,9 @@ public enum TycoonCustomer: String, CaseIterable, Codable, Sendable {
         case .artStudio: 410
         case .arcadeWorkshop: 525
         case .makerCollective: 750
+        case .harborOutfitters: 900
+        case .galleryStore: 1_150
+        case .uptownBoutique: 1_400
         }
     }
 
@@ -107,7 +117,7 @@ public enum TycoonCustomer: String, CaseIterable, Codable, Sendable {
         case .plantShop, .gadgetShop: .shopfront
         case .homeGoods, .artStudio: .depot
         case .arcadeWorkshop: .warehouse
-        case .makerCollective: .hub
+        case .makerCollective, .harborOutfitters, .galleryStore, .uptownBoutique: .hub
         }
     }
 
@@ -121,7 +131,12 @@ public enum TycoonCustomer: String, CaseIterable, Codable, Sendable {
         case .artStudio: 40
         case .arcadeWorkshop: 65
         case .makerCollective: 130
+        case .harborOutfitters, .galleryStore, .uptownBoutique: 130
         }
+    }
+
+    public var neighborhood: Neighborhood {
+        switch self { case .harborOutfitters: .harbor; case .galleryStore: .artsQuarter; case .uptownBoutique: .uptown; default: .oldTown }
     }
 }
 
@@ -183,7 +198,8 @@ public struct ShipmentReceipt: Equatable, Codable, Sendable {
     public var isValid: Bool {
         guard order.isValid, cleanBonus == 0 || cleanBonus == order.customer.basePay / 5 else { return false }
         let maximum = (order.customer.basePay + 18 * DepotUpgrade.maxLevel)
-            * (100 + 10 * DepotUpgrade.maxLevel) / 100 + cleanBonus
+            * (100 + 10 * DepotUpgrade.maxLevel) / 100 * 220 / 100 * 140 / 100
+            * 150 / 100 * 120 / 100 * 115 / 100 + cleanBonus
         return (order.customer.basePay + cleanBonus...maximum).contains(payout)
     }
 }
@@ -198,17 +214,21 @@ public struct TycoonAccount: Equatable, Codable, Sendable {
     public var lastDelivery: ShipmentReceipt?
     public var teams: [TycoonCustomer: TycoonTeam]
     public var automatedOrders: Int
+    public var progression: TycoonProgression
 
     public init(seed: UInt64) {
         self.seed = seed; cash = 0; totalEarned = 0; completedOrders = 0; stage = .spareRoom
         levels = Dictionary(uniqueKeysWithValues: DepotUpgrade.allCases.map { ($0, 0) })
         lastDelivery = nil
         teams = [:]; automatedOrders = 0
+        progression = TycoonProgression()
     }
 
     private enum CodingKeys: String, CodingKey {
-        case seed, cash, totalEarned, completedOrders, stage, levels, lastDelivery, teams, automatedOrders
+        case seed, cash, totalEarned, completedOrders, stage, levels, lastDelivery, teams, automatedOrders, progression
     }
+
+    private enum LifetimeKeys: String, CodingKey { case lifetimeManualOrders, lifetimeAutomatedOrders, lifetimeEarned }
 
     public init(from decoder: any Decoder) throws {
         let saved = try decoder.container(keyedBy: CodingKeys.self)
@@ -221,6 +241,31 @@ public struct TycoonAccount: Equatable, Codable, Sendable {
         lastDelivery = try saved.decodeIfPresent(ShipmentReceipt.self, forKey: .lastDelivery)
         teams = try saved.decodeIfPresent([TycoonCustomer: TycoonTeam].self, forKey: .teams) ?? [:]
         automatedOrders = try saved.decodeIfPresent(Int.self, forKey: .automatedOrders) ?? 0
+        let decoded = try? saved.decodeIfPresent(TycoonProgression.self, forKey: .progression)
+        if let decoded, decoded.isValid {
+            progression = decoded
+            let fields = try? saved.nestedContainer(keyedBy: LifetimeKeys.self, forKey: .progression)
+            if fields?.contains(.lifetimeManualOrders) != true { progression.lifetimeManualOrders = max(0, min(completedOrders, 1_000_000_000_000)) }
+            if fields?.contains(.lifetimeAutomatedOrders) != true { progression.lifetimeAutomatedOrders = max(0, min(automatedOrders, 1_000_000_000_000)) }
+            if fields?.contains(.lifetimeEarned) != true { progression.lifetimeEarned = max(0, min(totalEarned, 1_000_000_000_000)) }
+        } else {
+            progression = TycoonProgression()
+            progression.lifetimeManualOrders = max(0, min(completedOrders, 1_000_000_000_000))
+            progression.lifetimeAutomatedOrders = max(0, min(automatedOrders, 1_000_000_000_000))
+            progression.lifetimeEarned = max(0, min(totalEarned, 1_000_000_000_000))
+        }
+        if let contract = progression.activeContract {
+            let slot = (max(1, contract.id) - 1) % 3
+            let kindMatches = slot == 0 ? contract.kind == .supply
+                : (contract.kind == .premium || (slot == 2 && contract.kind == .landmark && stage == .hub))
+            let canonical = makeContract(customer: contract.customer, kind: contract.kind, slot: slot,
+                                         completed: progression.completedContracts)
+            if !isUnlocked(contract.customer) || !kindMatches || contract.id != canonical.id
+                || contract.target != canonical.target || contract.reward != canonical.reward || contract.title != canonical.title {
+                progression.activeContract = nil
+            }
+        }
+        if progression.branches.count > 0 && stage != .hub { progression.branches = [:]; progression.district = .oldTown }
     }
 
     public var deliveryCount: Int {
@@ -234,7 +279,19 @@ public struct TycoonAccount: Equatable, Codable, Sendable {
               cash <= totalEarned, (0..<TycoonLimits.orders).contains(completedOrders),
               (0...TycoonLimits.automatedOrders).contains(automatedOrders),
               levels.count <= DepotUpgrade.allCases.count,
-              levels.values.allSatisfy({ (0...DepotUpgrade.maxLevel).contains($0) }) else { return false }
+              levels.values.allSatisfy({ (0...DepotUpgrade.maxLevel).contains($0) }), progression.isValid else { return false }
+        if let contract = progression.activeContract {
+            guard isUnlocked(contract.customer), contract.id > progression.completedContracts * 3,
+                  contract.id <= progression.completedContracts * 3 + 3 else { return false }
+            let canonical = makeContract(customer: contract.customer, kind: contract.kind,
+                                         slot: (contract.id - 1) % 3, completed: progression.completedContracts)
+            let slot = (contract.id - 1) % 3
+            let kindMatches = slot == 0 ? contract.kind == .supply
+                : (contract.kind == .premium || (slot == 2 && contract.kind == .landmark && stage == .hub))
+            guard contract.id == canonical.id, contract.target == canonical.target, contract.reward == canonical.reward,
+                  contract.title == canonical.title, kindMatches else { return false }
+        }
+        guard progression.branches.isEmpty || stage == .hub else { return false }
         if stage != .spareRoom {
             guard deliveryCount >= TycoonLimits.expansionDeliveries[stage.rawValue - 1] else { return false }
         }
@@ -244,10 +301,13 @@ public struct TycoonAccount: Equatable, Codable, Sendable {
                       && (team.pendingOrders == 0 || (team.pendingOrders * (customer.basePay / 2)...team.pendingOrders * Self.maximumWorkerPayout(for: customer)).contains(team.pendingCash))
               }),
               automatedOrders <= TycoonLimits.automatedOrders - teams.values.reduce(0, { $0 + $1.pendingOrders }),
-              cash <= TycoonLimits.money - teams.values.reduce(0, { $0 + $1.pendingCash }),
-              totalEarned <= TycoonLimits.money - teams.values.reduce(0, { $0 + $1.pendingCash }),
+              cash <= TycoonLimits.money - pendingStaffCash - contractReserve,
+              totalEarned <= TycoonLimits.money - pendingStaffCash - contractReserve,
               totalEarned >= completedOrders * TycoonCustomer.cornerMarket.basePay + automatedOrders * (TycoonCustomer.cornerMarket.basePay / 2) else { return false }
         guard deliveryCount > 0 else {
+            if progression.franchises > 0 {
+                return totalEarned <= 1_250 && lastDelivery == nil && stage == .spareRoom
+            }
             return cash == 0 && totalEarned == 0 && lastDelivery == nil
                 && levels.values.allSatisfy { $0 == 0 } && teams.values.allSatisfy { $0.workers == 0 }
         }
@@ -261,11 +321,13 @@ public struct TycoonAccount: Equatable, Codable, Sendable {
 
     public func isUnlocked(_ customer: TycoonCustomer) -> Bool {
         stage.rawValue >= customer.minStage.rawValue && deliveryCount >= customer.minDeliveries
+            && (customer.neighborhood == .oldTown || progression.branches[customer.neighborhood] != nil)
     }
 
     public var offers: [TycoonOrder] {
         guard isValid else { return [] }
-        let unlocked = TycoonCustomer.allCases.filter { isUnlocked($0) }
+        let local = TycoonCustomer.allCases.filter { isUnlocked($0) && $0.neighborhood == progression.district }
+        let unlocked = local.isEmpty ? TycoonCustomer.allCases.filter { isUnlocked($0) } : local
         guard let highest = unlocked.last else { return [] }
         var random = SeededRandom(state: seed ^ (UInt64(completedOrders) &* 0x8EBC6AF09C88C6E3))
         let clients = [unlocked[0], unlocked[random.index(unlocked.count)], highest]
@@ -287,7 +349,7 @@ public struct TycoonAccount: Equatable, Codable, Sendable {
         case .conveyor: 225
         case .dispatchDesk: 275
         }
-        return base * (current + 1) * (current + 1)
+        return base * (current + 1) * (current + 1) * (100 - 5 * franchiseUpgradeLevel(.buyingPower)) / 100
     }
 
     public func canBuy(_ upgrade: DepotUpgrade) -> Bool {
@@ -329,19 +391,28 @@ public struct TycoonAccount: Equatable, Codable, Sendable {
         guard accepts(session.order), session.isValid else { return 0 }
         let base = session.order.customer.basePay
         let equipmentPay = base + 8 * level(.workbench) + 4 * level(.shelves) + 6 * level(.labels)
-        return equipmentPay * (100 + 10 * level(.van)) / 100 + (session.hintsUsed == 0 ? base / 5 : 0)
+        var pay = equipmentPay * (100 + 10 * level(.van)) / 100
+        pay = pay * (100 + 10 * (milestoneCount(.workbench) + milestoneCount(.shelves) + milestoneCount(.labels))) / 100
+        pay = pay * (100 + 10 * milestoneCount(.van)) / 100
+        pay = pay * (100 + 10 * franchiseUpgradeLevel(.premiumService)) / 100
+        pay = pay * (100 + 2 * progression.blueprints) / 100
+        pay = pay * (100 + 3 * relationshipLevel(for: session.order.customer)) / 100
+        return pay + (session.hintsUsed == 0 ? base / 5 : 0)
     }
 
     @discardableResult public mutating func ship(_ session: TycoonSession) -> ShipmentReceipt? {
         guard accepts(session.order), session.isValid, session.state.isComplete,
               completedOrders < TycoonLimits.orders - 1 else { return nil }
         let earned = payout(for: session)
-        let reserved = teams.values.reduce(0) { $0 + $1.pendingCash }
+        let reserved = pendingStaffCash + contractReserve
         guard earned > 0, cash <= TycoonLimits.money - earned - reserved,
               totalEarned <= TycoonLimits.money - earned - reserved else { return nil }
         let receipt = ShipmentReceipt(order: session.order, payout: earned,
                                       cleanBonus: session.hintsUsed == 0 ? session.order.customer.basePay / 5 : 0)
-        cash += earned; totalEarned += earned; completedOrders += 1; lastDelivery = receipt
+        recordEarnings(earned, manual: 1); completedOrders += 1; lastDelivery = receipt
+        addRelationship(3, for: session.order.customer)
+        progression.manualBoostOrders = min(120, progression.manualBoostOrders + 2)
+        _ = progressContract(customer: session.order.customer, manual: true)
         return receipt
     }
 

@@ -16,6 +16,7 @@ import AudioToolbox
     var selectedID: Int?
     var pendingOrder: TycoonOrder?
     var showHelp = false
+    var showFranchiseConfirmation = false
 
     private let store: TycoonStore
     private let defaults: UserDefaults
@@ -127,9 +128,13 @@ import AudioToolbox
             message = "Fill the box before shipping."
             return
         }
+        let oldContract = account.progression.completedContracts
         guard commit(account: updated, session: session) else { return }
         selectedID = nil
         message = "Delivered to \(order.customer.title) · +$\(receipt.payout) earned."
+        if account.progression.completedContracts > oldContract, let contract = account.progression.lastContract {
+            message += " \(contract.title) complete · +$\(contract.reward) banked."
+        }
         feedback(complete: true)
     }
 
@@ -207,16 +212,92 @@ import AudioToolbox
         feedback(complete: true)
     }
 
+    func acceptContract(_ contract: TycoonContract) {
+        refreshStaff()
+        var updated = account
+        guard updated.acceptContract(contract), commit(account: updated, session: session) else { return }
+        message = "\(contract.title) accepted. \(contract.kind == .supply ? "Your crew and manual shipments count." : "Pack this customer's boxes yourself to finish the job.")"
+        feedback()
+    }
+
+    func setSpecialty(_ specialty: CrewSpecialty, for customer: TycoonCustomer) {
+        refreshStaff()
+        var updated = account
+        guard updated.setSpecialty(specialty, for: customer), commit(account: updated, session: session) else { return }
+        staffMessage = "\(customer.title) team now uses \(specialty.title.lowercased())."
+        feedback()
+    }
+
+    func openBranch(_ neighborhood: Neighborhood) {
+        refreshStaff()
+        var updated = account
+        guard updated.openBranch(neighborhood), commit(account: updated, session: session) else { return }
+        message = "Your \(neighborhood.title) branch is open and earning alongside your depot."
+        feedback(complete: true)
+    }
+
+    func upgradeBranch(_ neighborhood: Neighborhood) {
+        refreshStaff()
+        var updated = account
+        guard updated.upgradeBranch(neighborhood), commit(account: updated, session: session) else { return }
+        message = "\(neighborhood.title) branch upgraded. Its next shipments earn more."
+        feedback(complete: true)
+    }
+
+    func visitNeighborhood(_ neighborhood: Neighborhood) {
+        refreshStaff()
+        var updated = account
+        guard updated.visit(neighborhood), commit(account: updated, session: session) else { return }
+        message = "Welcome to \(neighborhood.title). Your current box stays ready to pack."
+    }
+
+    func buyFranchiseUpgrade(_ upgrade: FranchiseUpgrade) {
+        refreshStaff()
+        var updated = account
+        guard updated.buyFranchiseUpgrade(upgrade), commit(account: updated, session: session) else { return }
+        message = "\(upgrade.title) improved at Head Office.\(upgrade == .establishedBusiness ? " Your starter package applies to your next franchise." : "")"
+        feedback(complete: true)
+    }
+
+    func requestFranchise() {
+        refreshStaff()
+        guard account.canFranchise else { message = account.franchiseRequirement; return }
+        showFranchiseConfirmation = true
+    }
+
+    func cancelFranchise() { showFranchiseConfirmation = false }
+
+    func confirmFranchise() {
+        guard showFranchiseConfirmation else { return }
+        refreshStaff()
+        var updated = account
+        let reward = updated.franchiseReward
+        guard updated.franchise() else { message = account.franchiseRequirement; return }
+        let moment = now()
+        guard SavedTycoon.validDate(moment) else { message = "Couldn't save the new depot. Try again."; return }
+        let anchor = max(moment, staffUpdatedAt)
+        let newOrder = TycoonOrder.generate(accountSeed: updated.seed, sequence: updated.completedOrders + 1,
+                                           choice: 0, customer: .cornerMarket)
+        guard commit(account: updated, session: TycoonSession(order: newOrder), timestamp: anchor) else { return }
+        showFranchiseConfirmation = false
+        pendingOrder = nil
+        selectedID = nil
+        staffMessage = ""
+        message = "Franchise opened · \(reward) stars earned. A fresh depot is ready."
+        feedback(complete: true)
+    }
+
     func refreshStaff() {
         let moment = now()
         guard SavedTycoon.validDate(moment) else { return }
         let elapsed = moment.timeIntervalSince(staffUpdatedAt)
         guard elapsed > 0 else { return }
-        if !account.teams.values.contains(where: { $0.workers > 0 }) {
+        if !account.teams.values.contains(where: { $0.workers > 0 }) && account.progression.branches.isEmpty {
             staffUpdatedAt = moment
             return
         }
         var updated = account
+        let oldContract = account.progression.completedContracts
         let report = updated.advanceStaff(by: elapsed)
         // Timestamp and proceeds share one snapshot, so relaunch cannot replay elapsed work.
         guard commit(account: updated, session: session, timestamp: moment) else { return }
@@ -224,6 +305,9 @@ import AudioToolbox
             staffMessage = "Your crew shipped orders · +$\(report.earned) earned."
         } else if report.packedOrders > 0 {
             staffMessage = "Your workers shipped \(report.packedOrders) orders."
+        }
+        if account.progression.completedContracts > oldContract, let contract = account.progression.lastContract {
+            staffMessage += " \(contract.title) complete · +$\(contract.reward) banked."
         }
     }
 

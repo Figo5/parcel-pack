@@ -10,13 +10,14 @@ struct TycoonView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private enum Tab: String, CaseIterable {
-        case pack = "Pack", orders = "Orders", crew = "Crew", depot = "Depot"
+        case pack = "Pack", orders = "Orders", crew = "Crew", depot = "Depot", world = "World"
         var symbol: String {
             switch self {
             case .pack: "shippingbox"
             case .orders: "list.clipboard"
             case .crew: "person.2"
             case .depot: "building.2"
+            case .world: "map"
             }
         }
     }
@@ -43,6 +44,7 @@ struct TycoonView: View {
                     case .orders: ordersContent
                     case .crew: crewContent
                     case .depot: depotContent
+                    case .world: WorldView(model: model) { tab = .depot }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -60,7 +62,7 @@ struct TycoonView: View {
                 header
                 if tab == .pack || tab == .orders {
                     HStack(spacing: 8) {
-                        Text("Packing for \(model.order.customer.title)")
+                        Text("\(model.order.customer.title) · \(model.order.customer.neighborhood.title)")
                             .font(.footnote.weight(.semibold))
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 4)
@@ -116,14 +118,18 @@ struct TycoonView: View {
         } message: {
             Text("The parcels in this box will be set aside. Your cash and depot upgrades are safe.")
         }
-        .sheet(isPresented: $model.showHelp) { TycoonHelpSheet() }
+        .sheet(isPresented: $model.showHelp) { TycoonHelpSheet(offlineHours: model.account.offlineHours) }
+        .sheet(isPresented: $model.showFranchiseConfirmation) { FranchiseReviewSheet(model: model) }
+        .onChange(of: model.account.progression.franchises) { _, _ in tab = .pack }
     }
 
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Parcel Pack").font(.title3.bold())
-                Text(model.account.stage.title)
+                Text(model.account.progression.franchises > 0
+                     ? "\(model.account.stage.title) · Franchise \(model.account.progression.franchises + 1)"
+                     : model.account.stage.title)
                     .font(.caption.weight(.medium))
                     .foregroundStyle(Palette.muted)
             }
@@ -152,23 +158,29 @@ struct TycoonView: View {
     // MARK: Packing
 
     @ViewBuilder private func packingContent(in size: CGSize) -> some View {
-        orderTicket
-        board
-            .frame(maxWidth: min(size.width - 32, max(236, size.height * 0.44), 340))
-        if model.isShipped {
-            shipmentReceipt
-        } else {
-            VStack(spacing: 4) {
-                Text(model.message).font(.subheadline.weight(.medium))
-                if model.state.placements.isEmpty {
-                    Text("Drag a parcel in, or tap it and then its top-left square.")
-                        .font(.footnote).foregroundStyle(Palette.muted)
+        let compact = size.height < 600 && !dynamicTypeSize.isAccessibilitySize
+        let minimumBoardWidth = CGFloat(puzzle.width) * 44 + 16
+        let desiredBoardWidth = compact ? 200.0 : max(236, size.height * 0.44)
+        VStack(spacing: compact ? 8 : 16) {
+            orderTicket
+            PackingProgressView(account: model.account, customer: model.order.customer, compact: compact) { tab = .orders }
+            board
+                .frame(maxWidth: min(size.width - 32, max(minimumBoardWidth, desiredBoardWidth), 340))
+            if model.isShipped {
+                shipmentReceipt
+            } else {
+                VStack(spacing: 4) {
+                    Text(model.message).font(compact ? .footnote.weight(.medium) : .subheadline.weight(.medium))
+                    if model.state.placements.isEmpty && !compact {
+                        Text("Drag a parcel in, or tap it and then its top-left square.")
+                            .font(.footnote).foregroundStyle(Palette.muted)
+                    }
                 }
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, minHeight: compact ? 24 : 36)
+                .accessibilityElement(children: .combine)
+                parcelTray
             }
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity, minHeight: 36)
-            .accessibilityElement(children: .combine)
-            parcelTray
         }
     }
 
@@ -390,22 +402,32 @@ struct TycoonView: View {
     // MARK: Orders
 
     private var ordersContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Choose your next delivery").font(.title2.bold())
-                Text("Pick a customer. Your next orders stay with them until you choose another.")
-                    .font(.subheadline).foregroundStyle(Palette.muted)
+        VStack(alignment: .leading, spacing: 24) {
+            ContractBoardView(model: model) { customer in
+                if model.order.customer == customer && !model.isShipped {
+                    tab = .pack
+                } else {
+                    model.requestCustomer(customer)
+                    if model.pendingOrder == nil { tab = .pack }
+                }
             }
             VStack(alignment: .leading, spacing: 8) {
-                Text("Your customers").font(.headline)
-                Text("Grow your depot and make deliveries to reach the next client.")
+                Text("Your customers").font(.title2.bold())
+                Text("Every delivery builds trust. Your boxes earn 3 XP; crew deliveries earn 1. Each trust level adds 3% pay and stays with you when you franchise.")
                     .font(.footnote).foregroundStyle(Palette.muted)
             }
             .padding(.top, 8)
-            VStack(spacing: 0) {
-                ForEach(TycoonCustomer.allCases, id: \.self) { customer in
-                    customerRow(customer)
-                    if customer != TycoonCustomer.allCases.last { Divider().overlay(Palette.grid.opacity(0.5)) }
+            ForEach(Neighborhood.allCases, id: \.self) { neighborhood in
+                let customers = TycoonCustomer.allCases.filter { $0.neighborhood == neighborhood }
+                if !customers.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(neighborhood.title).font(.headline).foregroundStyle(Palette.accent)
+                            .padding(.bottom, 4)
+                        ForEach(customers, id: \.self) { customer in
+                            customerRow(customer)
+                            if customer != customers.last { Divider().overlay(Palette.grid.opacity(0.5)) }
+                        }
+                    }
                 }
             }
             DisclosureGroup("Choose a different box") {
@@ -467,7 +489,7 @@ struct TycoonView: View {
                     .frame(width: 36).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(customer.title).font(.subheadline.weight(.semibold))
-                    Text(unlocked ? customer.detail : "\(customer.minStage.title) · \(customer.minDeliveries) deliveries")
+                    Text(unlocked ? customer.detail : customerUnlockRequirement(customer))
                         .font(.caption).foregroundStyle(Palette.muted)
                 }
                 Spacer(minLength: 4)
@@ -479,7 +501,10 @@ struct TycoonView: View {
                 }
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(customer.title). \(unlocked ? "Available. Base pay \(money(customer.basePay))" : "Locked. Requires \(customer.minStage.title) and \(customer.minDeliveries) deliveries. \(model.account.deliveryCount) delivered")")
+            .accessibilityLabel("\(customer.title). \(unlocked ? "Available. Base pay \(money(customer.basePay))" : "Locked. \(customerUnlockRequirement(customer))")")
+            if unlocked || model.account.relationshipXP(for: customer) > 0 {
+                relationshipProgress(customer)
+            }
             if unlocked {
                 HStack(spacing: 12) {
                     Text(current ? "Your selected customer" : "\(customer.size.width) × \(customer.size.height) box")
@@ -505,6 +530,26 @@ struct TycoonView: View {
         .padding(.vertical, 12)
     }
 
+    private func relationshipProgress(_ customer: TycoonCustomer) -> some View {
+        let xp = model.account.relationshipXP(for: customer)
+        let level = model.account.relationshipLevel(for: customer)
+        let target = model.account.relationshipTarget(for: customer)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Trust \(level)/5 · +\(level * 3)% pay")
+                    .font(.caption.weight(.semibold)).foregroundStyle(Palette.accent)
+                Spacer(minLength: 8)
+                Text(target.map { "\(xp)/\($0) XP" } ?? "Trusted partner")
+                    .font(.caption).monospacedDigit().foregroundStyle(Palette.muted)
+            }
+            if let target {
+                ProgressView(value: Double(min(xp, target)), total: Double(max(1, target)))
+                    .tint(Palette.accent)
+                    .accessibilityLabel("\(customer.title) trust level \(level), \(xp) of \(target) XP to next level")
+            }
+        }
+    }
+
     // MARK: Crew
 
     private var crewContent: some View {
@@ -513,20 +558,24 @@ struct TycoonView: View {
                 Text("A little help with the boxes").font(.title2.bold())
                 Text("Hire a team for each customer. Workers pack, ship and put the earnings straight into your cash. Managers make their team faster and more profitable.")
                     .font(.subheadline).foregroundStyle(Palette.muted)
-                Label("Works while you're away · up to 8 hours", systemImage: "moon.zzz")
+                Label("Works while you're away · up to \(model.account.offlineHours) hours", systemImage: "moon.zzz")
                     .font(.caption.weight(.medium)).foregroundStyle(Palette.accent)
             }
             HStack {
                 Text("Customer teams").font(.headline)
                 Spacer(minLength: 8)
-                Text("\(model.account.automatedOrders) staff deliveries")
+                Text("\(model.account.automatedOrders) automated deliveries")
                     .font(.caption).foregroundStyle(Palette.muted).monospacedDigit()
             }
-            VStack(spacing: 0) {
-                ForEach(TycoonAccount.automatableCustomers, id: \.self) { customer in
-                    crewRow(customer)
-                    if customer != TycoonAccount.automatableCustomers.last {
-                        Divider().overlay(Palette.grid.opacity(0.5))
+            ForEach(Neighborhood.allCases, id: \.self) { neighborhood in
+                let customers = TycoonAccount.automatableCustomers.filter { $0.neighborhood == neighborhood }
+                if !customers.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(neighborhood.title).font(.headline).foregroundStyle(Palette.accent)
+                        ForEach(customers, id: \.self) { customer in
+                            crewRow(customer)
+                            if customer != customers.last { Divider().overlay(Palette.grid.opacity(0.5)) }
+                        }
                     }
                 }
             }
@@ -552,7 +601,7 @@ struct TycoonView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(customer.title).font(.headline)
                     Text(unlocked ? "\(workers) \(workers == 1 ? "worker" : "workers")\(managed ? " · managed" : "")"
-                         : "\(customer.minStage.title) · \(customer.minDeliveries) deliveries")
+                         : customerUnlockRequirement(customer))
                         .font(.caption).foregroundStyle(Palette.muted)
                 }
                 Spacer(minLength: 4)
@@ -614,6 +663,9 @@ struct TycoonView: View {
                             .accessibilityHint("Makes packing 25 percent faster and increases earnings by 25 percent. Hire a worker first.")
                     }
                 }
+                if managed {
+                    managerSpecialty(for: customer)
+                }
                 if workers == 0 {
                     Text(hireRequirement(for: customer))
                         .font(.caption).foregroundStyle(Palette.muted)
@@ -633,6 +685,39 @@ struct TycoonView: View {
             }
         }
         .padding(.vertical, 16)
+    }
+
+    private func managerSpecialty(for customer: TycoonCustomer) -> some View {
+        let current = model.account.teams[customer]?.specialty ?? .general
+        return VStack(alignment: .leading, spacing: 6) {
+            Menu {
+                ForEach(CrewSpecialty.allCases, id: \.self) { specialty in
+                    Button {
+                        performStaffAction(for: customer) { model.setSpecialty(specialty, for: customer) }
+                    } label: {
+                        if specialty == current {
+                            Label(specialty.title, systemImage: "checkmark")
+                        } else {
+                            Text(specialty.title)
+                        }
+                    }
+                    .disabled(!model.account.canSetSpecialty(specialty, for: customer))
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Specialty: \(current.title)").font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.up.chevron.down").font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(Palette.accent)
+                .padding(.horizontal, 12).padding(.vertical, 12)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
+            }
+            .accessibilityLabel("\(customer.title) manager specialty, \(current.title)")
+            .accessibilityHint("Choose a specialty for free. Earned progress is saved at the previous rate first.")
+            Text(current.detail).font(.caption).foregroundStyle(Palette.muted)
+        }
     }
 
     private func performStaffAction(for customer: TycoonCustomer, announce: Bool = true, action: () -> Void) {
@@ -655,6 +740,15 @@ struct TycoonView: View {
     }
 
     private func customerUnlockRequirement(_ customer: TycoonCustomer) -> String {
+        if customer.neighborhood != .oldTown {
+            let district = customer.neighborhood
+            if model.account.progression.franchises < district.requiredFranchises {
+                return "Establish \(district.requiredFranchises) \(district.requiredFranchises == 1 ? "franchise" : "franchises") to unlock \(district.title)."
+            }
+            if model.account.progression.branches[district] == nil {
+                return "Open your \(district.title) branch in World."
+            }
+        }
         let remaining = max(0, customer.minDeliveries - model.account.deliveryCount)
         let needsBuilding = model.account.stage.rawValue < customer.minStage.rawValue
         if needsBuilding && remaining > 0 { return "Move to your \(customer.minStage.title.lowercased()) and deliver \(remaining) more orders." }
@@ -667,10 +761,13 @@ struct TycoonView: View {
     private var workerCount: Int { model.account.teams.values.reduce(0) { $0 + $1.workers } }
     private var managerCount: Int { model.account.teams.values.filter(\.hasManager).count }
     private var incomePerMinute: Double {
-        TycoonAccount.automatableCustomers.reduce(0) { total, customer in
+        let teams = TycoonAccount.automatableCustomers.reduce(0.0) { total, customer in
             let interval = model.account.workerInterval(for: customer)
             guard interval > 0 else { return total }
             return total + Double(model.account.workerPayout(for: customer)) * 60 / interval
+        }
+        return teams + model.account.progression.branches.keys.reduce(0.0) {
+            $0 + Double(model.account.branchPayout($1))
         }
     }
     private var workforceDescription: String {
@@ -683,21 +780,26 @@ struct TycoonView: View {
     private var depotContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(model.account.stage.title).font(.title2.bold())
-                Text(model.account.stage.detail).font(.subheadline).foregroundStyle(Palette.muted)
+                Text(model.account.progression.district == .oldTown
+                     ? model.account.stage.title
+                     : "\(model.account.progression.district.title) branch").font(.title2.bold())
+                Text(model.account.progression.district == .oldTown
+                     ? "\(model.account.stage.detail) Based in \(model.account.progression.district.title)."
+                     : "\(model.account.progression.district.detail) Your main depot and every owned branch keep working.")
+                    .font(.subheadline).foregroundStyle(Palette.muted)
             }
             DepotScene(account: model.account)
                 .padding(.horizontal, -12)
             Button { tab = .crew } label: {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(workerCount == 0 ? "Room for a crew" : workforceDescription)
+                        Text(workerCount == 0 ? "Room for a crew" : "Company crew · \(workforceDescription)")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.ink)
-                        Text(workerCount == 0 ? "Hire your first worker in Crew" : "Your team ships and banks every order")
+                        Text(workerCount == 0 ? "Hire your first worker in Crew" : "Estimated income across all locations")
                             .font(.caption).foregroundStyle(Palette.muted)
                     }
                     Spacer(minLength: 8)
-                    if workerCount > 0 {
+                    if incomePerMinute > 0 {
                         Text(incomePace).font(.headline).monospacedDigit().foregroundStyle(Palette.accent)
                     }
                     Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(Palette.accent)
@@ -707,12 +809,23 @@ struct TycoonView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(workerCount == 0 ? "Hire your first worker in Crew" : "\(workforceDescription). Estimated staff income \(incomePace). Visit Crew.")
+            .accessibilityLabel(workerCount == 0 && incomePerMinute == 0 ? "Hire your first worker in Crew" : "\(workforceDescription). Estimated company income \(incomePace). Visit Crew.")
             .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid.opacity(0.65)).frame(height: 1) }
-            stageTrail
-            expansion
+            if model.account.progression.district == .oldTown {
+                stageTrail
+                expansion
+            } else if let branch = model.account.progression.branches[model.account.progression.district] {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Branch level \(branch.level)/10").font(.headline)
+                    Text("Banks \(money(model.account.branchPayout(model.account.progression.district))) every minute.")
+                        .font(.footnote).foregroundStyle(Palette.muted)
+                    Button { tab = .world } label: { Label("Grow this branch", systemImage: "arrow.right") }
+                        .buttonStyle(PillButtonStyle())
+                }
+            }
+            nextEquipmentUnlock
             HStack {
-                Text("Make it your own").font(.headline)
+                Text("Company equipment").font(.headline)
                 Spacer()
                 Text("\(model.account.deliveryCount) delivered")
                     .font(.caption).foregroundStyle(Palette.muted)
@@ -787,11 +900,38 @@ struct TycoonView: View {
             .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Palette.grid, lineWidth: 1))
         } else {
-            Label("Regional hub established. Keep growing your equipment and serving every customer.", systemImage: "checkmark.seal.fill")
-                .font(.subheadline.weight(.medium)).foregroundStyle(Palette.accent)
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Your Shipping hub is established", systemImage: "checkmark.seal.fill")
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(Palette.accent)
+                Text(model.account.franchiseRequirement).font(.footnote).foregroundStyle(Palette.muted)
+                Button { tab = .world } label: { Label("Plan your next franchise", systemImage: "arrow.right") }
+                    .buttonStyle(PillButtonStyle())
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    @ViewBuilder private var nextEquipmentUnlock: some View {
+        if let upgrade = DepotUpgrade.allCases.filter({ model.account.nextEquipmentMilestone($0) != nil }).min(by: {
+            (model.account.nextEquipmentMilestone($0)! - model.account.level($0))
+                < (model.account.nextEquipmentMilestone($1)! - model.account.level($1))
+        }), let target = model.account.nextEquipmentMilestone(upgrade) {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Next equipment milestone", systemImage: "flag")
+                    .font(.headline).foregroundStyle(Palette.accent)
+                Text("\(upgrade.title) · Level \(target)")
+                    .font(.subheadline.weight(.semibold))
+                Text("\(target - model.account.level(upgrade)) upgrades to the next transformation and a stronger equipment bonus.")
+                    .font(.footnote).foregroundStyle(Palette.muted)
+                if let cost = model.account.upgradeCost(upgrade) {
+                    Button { model.buy(upgrade) } label: { Text("Upgrade \(upgrade.title) · \(money(cost))") }
+                        .buttonStyle(PillButtonStyle())
+                        .disabled(!model.account.canBuy(upgrade))
+                }
+            }
+            .padding(.vertical, 12)
         }
     }
 
@@ -805,12 +945,20 @@ struct TycoonView: View {
                     .frame(width: 40, height: 40).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text(upgrade.title).font(.headline)
+                        Text(model.account.equipmentMilestoneTitle(upgrade)).font(.headline)
                         Spacer(minLength: 4)
                         Text("Lv. \(level)/\(DepotUpgrade.maxLevel)").font(.caption.weight(.semibold)).foregroundStyle(Palette.muted)
                     }
-                    Text(upgrade.detail).font(.footnote).foregroundStyle(Palette.muted)
+                    Text(upgrade.title).font(.caption.weight(.medium)).foregroundStyle(Palette.muted)
+                    Text(model.account.equipmentMilestoneDetail(upgrade)).font(.footnote).foregroundStyle(Palette.muted)
                 }
+            }
+            if let target = model.account.nextEquipmentMilestone(upgrade) {
+                ProgressView(value: Double(level), total: Double(target))
+                    .tint(Palette.accent)
+                    .accessibilityLabel("\(upgrade.title) milestone progress, level \(level) of \(target)")
+                Text("Next transformation at level \(target)")
+                    .font(.caption).foregroundStyle(Palette.accent)
             }
             if let cost {
                 HStack(spacing: 12) {
@@ -967,6 +1115,9 @@ struct TycoonView: View {
         case .artStudio: "paintbrush.pointed"
         case .arcadeWorkshop: "gamecontroller"
         case .makerCollective: "hammer"
+        case .harborOutfitters: "sailboat"
+        case .galleryStore: "photo.artframe"
+        case .uptownBoutique: "bag"
         }
     }
     private func equipmentSymbol(_ upgrade: DepotUpgrade) -> String {
@@ -999,6 +1150,7 @@ struct TycoonView: View {
 }
 
 private struct TycoonHelpSheet: View {
+    let offlineHours: Int
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -1015,12 +1167,24 @@ private struct TycoonHelpSheet: View {
                     Label("Workbench, shelves, vans and label printers improve shipment pay. Each has 30 upgrade levels.", systemImage: "building.2")
                     Label("Conveyors help staff pack faster. Dispatch desks improve staff shipment pay.", systemImage: "arrow.right.square")
                     Label("Your own deliveries and shipped staff orders both unlock customers and count toward bigger buildings.", systemImage: "building.2.crop.circle")
+                    Label("Equipment transforms at levels 5, 10, 20 and 30, adding milestone bonuses and changing your depot.", systemImage: "flag")
+                }
+                Section("Contracts and customer trust") {
+                    Label("Accept one contract in Orders. Supply jobs count matching crew and manual shipments; premium and landmark jobs need your own packing. Rewards bank automatically.", systemImage: "list.clipboard")
+                    Label("Your boxes build 3 customer XP and add 2 crew deliveries at 20% extra pay. Crew orders build 1 XP; a Mentor manager builds 2.", systemImage: "bolt.circle")
+                    Label("Each trust level adds 3% customer pay. Premium contracts earn permanent blueprints, up to 20% extra manual pay, and 12 boosted crew deliveries.", systemImage: "heart")
                 }
                 Section("Build a crew") {
-                    Label("The first six customers can each have up to 20 workers. More workers make that team pack faster.", systemImage: "person.2")
+                    Label("The first six customers and new neighborhood stores can each have up to 20 workers. More workers make that team pack faster.", systemImage: "person.2")
                     Label("Every worker automatically packs and ships orders. Earnings go straight into your cash.", systemImage: "tray.and.arrow.down")
                     Label("Hire a manager after your first worker to make that team pack 25% faster and earn 25% more per order.", systemImage: "person.crop.circle.badge.checkmark")
-                    Label("Staff keep working while the app is closed, for up to eight hours between visits. Your own packing order stays saved.", systemImage: "moon.zzz")
+                    Label("Managed teams can specialize in Express speed, Careful packing pay, or Mentor customer trust. Reassign a specialty for free.", systemImage: "person.crop.circle")
+                    Label("Staff and branches keep working while the app is closed, for up to \(offlineHours) hours between visits. Logistics upgrades extend this. Your packing order stays saved.", systemImage: "moon.zzz")
+                }
+                Section("Grow across the city") {
+                    Label("At the Shipping hub, finish a landmark contract to qualify for Franchising. World shows the exact Stars you'll receive and what resets before you choose to confirm.", systemImage: "star")
+                    Label("Franchise Stars buy permanent Head Office upgrades. Established Business gives starting cash and a worker on your next franchise.", systemImage: "building.2")
+                    Label("Franchises unlock neighborhoods. Open satellite branches once your main depot is a Shipping hub; all owned locations keep earning when you visit another.", systemImage: "map")
                 }
                 Section("Take your time") {
                     Text("No timer or lives. Your order, cash and depot save as you play. Buying upgrades never resets the box you're packing.")

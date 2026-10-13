@@ -119,7 +119,7 @@ import Testing
         }
         let order = try #require(account.offers.first)
         let base = order.customer.basePay + 18 * DepotUpgrade.maxLevel
-        #expect(account.payout(for: completed(order)) == base * 400 / 100 + order.customer.basePay / 5)
+        #expect(account.payout(for: completed(order)) == base * 400 / 100 * 220 / 100 * 140 / 100 + order.customer.basePay / 5)
     }
 
     @Test func expandingKeepsTheAlreadyAcceptedOrderValid() throws {
@@ -155,7 +155,7 @@ import Testing
                 #expect(account.isValid)
             }
             #expect(locations == Set(DepotStage.allCases))
-            #expect(clients == Set(TycoonCustomer.allCases))
+            #expect(clients == Set(TycoonCustomer.allCases.filter { $0.neighborhood == .oldTown }))
             #expect(account.stage == .hub)
             #expect(account.completedOrders == 250)
             #expect(account.nextExpansionCost == nil)

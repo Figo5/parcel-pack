@@ -7,13 +7,20 @@ import ParcelCore
 struct DepotScene: View {
     let account: TycoonAccount
 
-    private var stage: Int { account.stage.rawValue }
+    private var district: Neighborhood { account.progression.district }
+    private var stage: Int {
+        district == .oldTown ? account.stage.rawValue
+            : min(4, ((account.progression.branches[district]?.level ?? 1) + 1) / 2)
+    }
     private var roomWidth: CGFloat { CGFloat(8 + min(stage, 2)) }
     private var roomDepth: CGFloat { stage >= 2 ? 8 : 7 }
-    private var workers: Int { account.teams.values.reduce(0) { $0 + $1.workers } }
-    private var managers: Int { account.teams.values.filter(\.hasManager).count }
+    private var localTeams: [TycoonTeam] { account.teams.filter { $0.key.neighborhood == district }.map(\.value) }
+    private var workers: Int { localTeams.reduce(0) { $0 + $1.workers } }
+    private var managers: Int { localTeams.filter(\.hasManager).count }
     private var originX: CGFloat { 180 - (roomWidth - roomDepth) * 8.5 }
-    private var canvasHeight: CGFloat { account.level(.van) > 0 ? 286 : stage >= 2 ? 260 : 242 }
+    private var canvasHeight: CGFloat {
+        account.level(.van) >= 5 ? 310 : account.level(.van) > 0 ? 286 : stage >= 2 ? 260 : 242
+    }
 
     var body: some View {
         Canvas { context, size in
@@ -24,7 +31,7 @@ struct DepotScene: View {
         }
         .aspectRatio(360.0 / canvasHeight, contentMode: .fit)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Your \(account.stage.title), \(workers) \(workers == 1 ? "worker" : "workers") and \(managers) \(managers == 1 ? "manager" : "managers"). Workbench level \(account.level(.workbench)), shelves level \(account.level(.shelves)), van level \(account.level(.van)), label printer level \(account.level(.labels)), conveyor level \(account.level(.conveyor)), dispatch desk level \(account.level(.dispatchDesk)).")
+        .accessibilityLabel("Your \(district.title) \(district == .oldTown ? account.stage.title.lowercased() : "branch"), \(workers) \(workers == 1 ? "worker" : "workers") and \(managers) \(managers == 1 ? "manager" : "managers"). \(account.equipmentMilestoneTitle(.workbench)) level \(account.level(.workbench)), \(account.equipmentMilestoneTitle(.shelves)) level \(account.level(.shelves)), \(account.equipmentMilestoneTitle(.van)) level \(account.level(.van)), \(account.equipmentMilestoneTitle(.labels)) level \(account.level(.labels)), \(account.equipmentMilestoneTitle(.conveyor)) level \(account.level(.conveyor)), \(account.equipmentMilestoneTitle(.dispatchDesk)) level \(account.level(.dispatchDesk)).")
     }
 
     private func point(_ u: CGFloat, _ v: CGFloat, _ z: CGFloat = 0) -> CGPoint {
@@ -65,7 +72,7 @@ struct DepotScene: View {
         polygon([point(3.4, 0.2), point(5.8, 0.2), point(7.3, 4.4), point(3.7, 5.1)],
                 color: Palette.surface.opacity(0.19), in: &context)
 
-        wallSign("PARCEL PACK", center: point(0, 3.4, 3.25), angle: -25, width: 91, in: &context)
+        wallSign(district.title.uppercased(), center: point(0, 3.4, 3.25), angle: -25, width: 91, in: &context)
         window(in: &context)
         noticeboard(in: &context)
         if stage >= 2 {
@@ -84,16 +91,16 @@ struct DepotScene: View {
         floorZone(u: width - 2.75, v: 0.55, width: 2.3, depth: 2.0,
                   color: Color(hex: 0xE5C574), in: &context)
 
-        let rackCount = min(3, 1 + stage / 3 + account.level(.shelves) / 12)
+        let rackCount = min(3, 1 + stage / 3 + account.level(.shelves) / 5)
         for index in 0..<rackCount {
             rack(u: 0.38, v: 0.4 + CGFloat(index) * 2.15,
-                 upgraded: account.level(.shelves) > 0,
+                 level: account.level(.shelves),
                  stock: min(9, 4 + stage + account.level(.shelves) / 5), in: &context)
         }
         floorZone(u: 2.55, v: 2.75, width: 3.8, depth: 2.8,
                   color: Palette.accent.opacity(0.13), in: &context)
         packingBench(u: 3.0, v: 3.0, level: account.level(.workbench), withPrinter: account.level(.labels) > 0, in: &context)
-        if account.level(.workbench) >= 10 && stage >= 1 {
+        if account.level(.workbench) >= 5 && stage >= 1 {
             packingBench(u: 5.6, v: 5.0, level: account.level(.workbench), withPrinter: false, in: &context)
         }
         if account.level(.dispatchDesk) > 0 {
@@ -129,6 +136,12 @@ struct DepotScene: View {
 
         if account.level(.van) > 0 {
             van(at: CGPoint(x: 264, y: 254), level: account.level(.van), in: &context)
+            if account.level(.van) >= 5 {
+                van(at: CGPoint(x: 174, y: 276), level: account.level(.van), in: &context)
+            }
+            if account.level(.van) >= 20 {
+                van(at: CGPoint(x: 84, y: 277), level: account.level(.van), in: &context)
+            }
         } else {
             // A paper shipment label on the room's exposed front edge.
             var label = context
@@ -143,6 +156,26 @@ struct DepotScene: View {
         let u: CGFloat = 2.0, width: CGFloat = 1.55, low: CGFloat = 1.9, high: CGFloat = 3.2
         let points = [point(u, 0, high), point(u + width, 0, high), point(u + width, 0, low), point(u, 0, low)]
         polygon(points, color: Color(hex: 0x9EC5BE), in: &context)
+        switch district {
+        case .oldTown:
+            break
+        case .harbor:
+            for z in [CGFloat(2.1), 2.3, 2.5] {
+                line(point(u + 0.08, 0.01, z), point(u + width - 0.08, 0.01, z), color: Palette.surface.opacity(0.7), width: 1, in: &context)
+            }
+        case .artsQuarter:
+            polygon([point(u + 0.18, 0.01, 3.0), point(u + 0.6, 0.01, 3.0), point(u + 0.6, 0.01, 2.4), point(u + 0.18, 0.01, 2.4)],
+                    color: Palette.parcel(0), in: &context)
+            polygon([point(u + 0.75, 0.01, 2.75), point(u + 1.2, 0.01, 2.75), point(u + 1.2, 0.01, 2.1), point(u + 0.75, 0.01, 2.1)],
+                    color: Palette.parcel(1), in: &context)
+        case .uptown:
+            for index in 0..<3 {
+                let start = u + 0.08 + CGFloat(index) * 0.48
+                let top: CGFloat = index == 1 ? 3.08 : 2.75
+                polygon([point(start, 0.01, top), point(start + 0.38, 0.01, top), point(start + 0.38, 0.01, low), point(start, 0.01, low)],
+                        color: Color(hex: 0x829894), in: &context)
+            }
+        }
         context.stroke(path(points), with: .color(Palette.surface), lineWidth: 3)
         line(point(u + width / 2, 0, high), point(u + width / 2, 0, low), color: Palette.surface, width: 2, in: &context)
         line(point(u, 0, (low + high) / 2), point(u + width, 0, (low + high) / 2), color: Palette.surface, width: 2, in: &context)
@@ -210,12 +243,13 @@ struct DepotScene: View {
                      with: .color(Palette.surface))
     }
 
-    private func rack(u: CGFloat, v: CGFloat, upgraded: Bool, stock: Int, in context: inout GraphicsContext) {
-        let height: CGFloat = upgraded ? 2.65 : 1.9
-        let metal = upgraded ? Color(hex: 0x648875) : Color(hex: 0xAA8860)
+    private func rack(u: CGFloat, v: CGFloat, level: Int, stock: Int, in context: inout GraphicsContext) {
+        let upgraded = level > 0
+        let height: CGFloat = level >= 20 ? 3.3 : upgraded ? 2.65 : 1.9
+        let metal = level >= 10 ? Palette.accent : upgraded ? Color(hex: 0x648875) : Color(hex: 0xAA8860)
         polygon([point(u, v), point(u, v + 1.95), point(u, v + 1.95, height), point(u, v, height)],
                 color: Color(hex: upgraded ? 0xA7B9A4 : 0xC5AF88), in: &context)
-        let tiers = upgraded ? 3 : 2
+        let tiers = level >= 20 ? 4 : upgraded ? 3 : 2
         for row in 0..<tiers {
             let z = 0.16 + CGFloat(row) * 0.82
             cuboid(u: u, v: v, z: z, width: 0.8, depth: 1.95, height: 0.1, color: metal, in: &context)
@@ -231,6 +265,12 @@ struct DepotScene: View {
             }
         }
         cuboid(u: u, v: v, z: height, width: 0.8, depth: 1.95, height: 0.1, color: metal, in: &context)
+        if level >= 30 {
+            for end in [v + 0.3, v + 1.6] {
+                let lamp = point(u + 0.85, end, height - 0.25)
+                context.fill(Path(ellipseIn: CGRect(x: lamp.x - 2, y: lamp.y - 2, width: 4, height: 4)), with: .color(Palette.parcel(1)))
+            }
+        }
     }
 
     private func packingBench(u: CGFloat, v: CGFloat, level: Int, withPrinter: Bool, in context: inout GraphicsContext) {
@@ -256,6 +296,26 @@ struct DepotScene: View {
             floorZone(u: u + 2.13, v: v + 0.5, width: 0.42, depth: 0.47, z: 1.8,
                       color: Palette.surface, in: &context)
             line(point(u + 2.2, v + 0.6, 1.82), point(u + 2.5, v + 0.6, 1.82), color: Palette.accent, width: 1, in: &context)
+            if account.level(.labels) >= 5 {
+                for offset in [CGFloat(0.7), 0.9, 1.1] {
+                    floorZone(u: u + 2.15, v: v + offset, width: 0.32, depth: 0.16, z: 1.42,
+                              color: Palette.surface, in: &context)
+                }
+            }
+            if account.level(.labels) >= 10 {
+                line(point(u + 2.03, v + 0.45, 1.82), point(u + 2.03, v + 1.35, 1.82),
+                     color: Palette.accent, width: 2, in: &context)
+            }
+            if account.level(.labels) >= 20 {
+                cuboid(u: u + 2.12, v: v + 0.55, z: 1.82, width: 0.38, depth: 0.26, height: 0.25,
+                        color: Palette.surface, in: &context)
+            }
+            if account.level(.labels) >= 30 {
+                for offset in stride(from: CGFloat(0.08), to: 0.38, by: 0.07) {
+                    line(point(u + 2.12 + offset, v + 0.57, 2.08), point(u + 2.12 + offset, v + 0.79, 2.08),
+                         color: Palette.ink, width: 0.8, in: &context)
+                }
+            }
         } else {
             floorZone(u: u + 2.05, v: v + 0.25, width: 0.58, depth: 0.72, z: 1.39,
                       color: Palette.surface, in: &context)
@@ -263,9 +323,21 @@ struct DepotScene: View {
         let tape = point(u + 2.2, v + 1.15, 1.42)
         context.fill(Path(ellipseIn: CGRect(x: tape.x - 4, y: tape.y - 2, width: 8, height: 5)), with: .color(Palette.parcel(1)))
         context.fill(Path(ellipseIn: CGRect(x: tape.x - 1.5, y: tape.y - 1, width: 3, height: 2)), with: .color(Palette.surface))
+        if level >= 10 {
+            for end in [u + 0.3, u + 1.65] {
+                line(point(end, v + 0.25, 1.42), point(end, v + 1.45, 1.42),
+                     color: Palette.parcel(1), width: 1.5, in: &context)
+            }
+        }
         if level >= 20 {
             line(point(u + 0.1, v + 1.7, 0.9), point(u + 2.75, v + 1.7, 0.9),
                  color: Palette.accent, width: 3, in: &context)
+        }
+        if level >= 30 {
+            for end in [u + 0.2, u + 2.65] {
+                line(point(end, v + 0.1, 1.4), point(end, v + 0.1, 2.4), color: Palette.accent, width: 2, in: &context)
+            }
+            line(point(u + 0.2, v + 0.1, 2.4), point(u + 2.65, v + 0.1, 2.4), color: Palette.accent, width: 3, in: &context)
         }
     }
 
@@ -284,6 +356,22 @@ struct DepotScene: View {
                 color: Color(hex: 0xACD1C2), in: &context)
         line(point(u + 0.65, v + 0.4, 1.55), point(u + 0.65, v + 0.4, 1.38), color: Palette.ink, width: 2, in: &context)
         floorZone(u: u + 1.15, v: v + 0.45, width: 0.45, depth: 0.5, z: 1.39, color: Palette.surface, in: &context)
+        if account.level(.dispatchDesk) >= 5 {
+            floorZone(u: u + 0.22, v: v + 0.85, width: 0.75, depth: 0.2, z: 1.39, color: Color(hex: 0xACD1C2), in: &context)
+        }
+        if account.level(.dispatchDesk) >= 10 {
+            cuboid(u: u + 1.15, v: v + 0.1, z: 1.4, width: 0.42, depth: 0.16, height: 0.65,
+                    color: Palette.ink, in: &context)
+        }
+        if account.level(.dispatchDesk) >= 20 {
+            wallSign("ROUTES", center: point(u + 0.9, 0.1, 3.25), angle: 25, width: 54, in: &context)
+        }
+        if account.level(.dispatchDesk) >= 30 {
+            let lamp = point(u + 1.36, v + 0.25, 2.05)
+            context.fill(Path(ellipseIn: CGRect(x: lamp.x - 2, y: lamp.y - 2, width: 4, height: 4)), with: .color(Palette.parcel(1)))
+            line(point(u + 0.2, v + 0.9, 1.42), point(u + 1.0, v + 0.9, 1.42),
+                 color: Palette.accent, width: 2, in: &context)
+        }
     }
 
     private func conveyor(u: CGFloat, v: CGFloat, level: Int, in context: inout GraphicsContext) {
@@ -299,6 +387,25 @@ struct DepotScene: View {
         line(point(u, v + 0.65, 0.83), point(u + width, v + 0.65, 0.83), color: Palette.accent, width: 2, in: &context)
         parcel(u: u + width * 0.5, v: v + 0.08, z: 0.83, width: 0.55, depth: 0.48, height: 0.48,
                color: Palette.cardboard, in: &context)
+        if level >= 5 {
+            cuboid(u: u, v: v - 0.8, z: 0.6, width: width, depth: 0.65, height: 0.2, color: Palette.ink, in: &context)
+            for offset in stride(from: CGFloat(0.12), to: width, by: 0.2) {
+                line(point(u + offset, v - 0.8, 0.81), point(u + offset, v - 0.15, 0.81),
+                     color: Color(hex: 0xAEC0AF), width: 1.2, in: &context)
+            }
+        }
+        if level >= 10 {
+            for edge in [v - 0.8, v + 0.65] {
+                line(point(u + width - 0.5, edge, 0.8), point(u + width - 0.5, edge, 1.85),
+                     color: Palette.accent, width: 3, in: &context)
+            }
+            line(point(u + width - 0.5, v - 0.8, 1.85), point(u + width - 0.5, v + 0.65, 1.85),
+                 color: level >= 20 ? Palette.parcel(1) : Palette.accent, width: level >= 20 ? 5 : 3, in: &context)
+        }
+        if level >= 30 {
+            cuboid(u: u + width - 0.3, v: v + 0.8, z: 0, width: 0.6, depth: 0.4, height: 1.4,
+                    color: Color(hex: 0x8DB5A0), in: &context)
+        }
     }
 
     private func pallet(u: CGFloat, v: CGFloat, in context: inout GraphicsContext) {
@@ -324,7 +431,7 @@ struct DepotScene: View {
     private func drawStaff(in context: inout GraphicsContext) {
         let workerPositions: [(CGFloat, CGFloat)] = [(4.5, 5.15), (5.65, 4.9), (6.1, 6.25), (2.35, 3.6), (7.15, 3.9), (6.9, 5.9)]
         var shown = 0
-        for (customerIndex, customer) in TycoonAccount.automatableCustomers.enumerated() {
+        for (customerIndex, customer) in TycoonAccount.automatableCustomers.filter({ $0.neighborhood == district }).enumerated() {
             let count = account.teams[customer]?.workers ?? 0
             for _ in 0..<min(count, 2) where shown < workerPositions.count {
                 let position = workerPositions[shown]
@@ -378,7 +485,8 @@ struct DepotScene: View {
         badge.translateBy(x: x + 21, y: y - 13)
         badge.rotate(by: .degrees(19))
         badge.draw(Text(Image(systemName: "shippingbox.fill")).font(.system(size: 12)).foregroundStyle(Palette.surface), at: .zero)
-        line(CGPoint(x: x + 3, y: y - 12), CGPoint(x: x + 36, y: y), color: Palette.surface.opacity(0.65), width: 2, in: &context)
+        line(CGPoint(x: x + 3, y: y - 12), CGPoint(x: x + 36, y: y),
+             color: level >= 30 ? Palette.parcel(1) : Palette.surface.opacity(0.65), width: level >= 30 ? 3 : 2, in: &context)
     }
 
     private func plant(at origin: CGPoint, in context: inout GraphicsContext) {
