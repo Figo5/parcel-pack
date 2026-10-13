@@ -22,4 +22,4 @@ Tycoon reuses the exact-fill generator. A canonical order combines account seed,
 
 Native Mac renders and interactions were checked at 430- and 375-point widths on October 12, 2026. The fixed-orientation iOS build is installed and running in Xcode 27 Device Hub on an iPhone 18 Pro simulator. The signed build is installed and opens on a physical iPhone 15 with iOS 26.7.1. Additional gesture, accessibility, audio, and haptic checks remain.
 
-The new tycoon flow was played on the 375-point Mac layout and the iPhone 18 Pro simulator on October 13, including the first equipment purchase, customer unlock, and depot expansion. The physical tycoon update awaits reconnection.
+The new tycoon flow was played on the 375-point Mac layout and the iPhone 18 Pro simulator on October 13, including the first equipment purchase, customer unlock, and depot expansion. Version 1.1, build 2 was also installed and launched on the physical iPhone 15 that day.

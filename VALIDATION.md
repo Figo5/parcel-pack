@@ -8,7 +8,7 @@ Date: October 13, 2026 (America/New_York).
 - `zsh scripts/build-mac.sh` produces the current native release app. The script now resolves SwiftPM's actual binary directory, including Xcode 27's build layout, instead of potentially copying a stale binary.
 - The ParcelPack Xcode scheme builds successfully for generic iOS Simulator, Debug, using SDK 27.0 with signing disabled. Both arm64 and x86_64 sources compile. The binary is also installed and running on an iPhone 18 Pro simulator with iOS 27.0 in Device Hub.
 - The project includes all 15 shared Swift source files, a shared scheme, and the existing 1024×1024 opaque app icon. iOS deployment target remains 17.0. Mac and iOS version is 1.1, build 2.
-- The version 1.1 Debug iPhone build succeeds with automatic signing. `codesign --verify --deep --strict` passes; the embedded development profile includes the user's iPhone 15. Installation awaits phone reconnection.
+- The version 1.1 Debug iPhone build succeeds with automatic signing. `codesign --verify --deep --strict` passes; the embedded development profile includes the user's iPhone 15. The update installed and launched successfully on that phone. A filtered device app listing confirms version 1.1, build 2.
 - Project regeneration retains the user's local signing configuration. The canonical project staged for Git leaves the development team empty.
 
 ## Tycoon checks
@@ -66,7 +66,7 @@ The original checks still pass: 180 generated puzzles across three sizes; 90 hin
 
 ## Physical iPhone installation and remaining checks
 
-Xcode is installed and its license/setup is complete. The iOS 27.0 runtime is installed and the game runs on an iPhone 18 Pro simulator. The earlier version 1.0 Debug build was provisioned with the user’s Personal Team, verified with codesign, and installed on a physical iPhone 15 running iOS 26.7.1. The user completed Developer Mode, Keychain authorization, and developer trust, then confirmed Parcel Pack opens. That profile includes the device and expires October 19, 2026 at 4:31 PM Eastern. The tycoon update awaits phone reconnection. Local Xcode team settings are retained without being committed.
+Xcode is installed and its license/setup is complete. The iOS 27.0 runtime is installed and the game runs on an iPhone 18 Pro simulator. The version 1.1, build 2 Debug tycoon update was provisioned with the user’s Personal Team, verified with codesign, and installed on a physical iPhone 15 running iOS 26.7.1 on October 13. Device Control reported a successful launch and confirmed the installed version and build. The user previously completed Developer Mode, Keychain authorization, and developer trust, then confirmed the original version opens. The current profile includes the device and expires October 19, 2026 at 4:31 PM Eastern. Local Xcode team settings are retained without being committed.
 
 Physical finger placement, additional phone sizes and accessibility settings, audio, and haptics still need focused checks. No IPA, TestFlight upload, or App Store release has been made.
 
