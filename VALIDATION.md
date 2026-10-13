@@ -1,13 +1,26 @@
 # Parcel Pack validation
 
-Date: October 12, 2026 (America/New_York).
+Date: October 13, 2026 (America/New_York).
 
 ## Builds and tests
 
-- **41 tests pass** with Swift 6.4 in Xcode 27.0 (27A266a): 22 core tests and 19 app model tests.
+- **60 tests pass** with Swift 6.4 in Xcode 27.0 (27A266a): 36 core tests and 24 app model tests. The previous 41 checks remain, with 19 added tycoon checks.
 - `zsh scripts/build-mac.sh` produces the current native release app. The script now resolves SwiftPM's actual binary directory, including Xcode 27's build layout, instead of potentially copying a stale binary.
 - The ParcelPack Xcode scheme builds successfully for generic iOS Simulator, Debug, using SDK 27.0 with signing disabled. Both arm64 and x86_64 sources compile. The binary is also installed and running on an iPhone 18 Pro simulator with iOS 27.0 in Device Hub.
-- The project includes all ten shared Swift source files, a shared scheme, and the existing 1024×1024 opaque app icon. iOS deployment target remains 17.0.
+- The project includes all 15 shared Swift source files, a shared scheme, and the existing 1024×1024 opaque app icon. iOS deployment target remains 17.0. Mac and iOS version is 1.1, build 2.
+- The version 1.1 Debug iPhone build succeeds with automatic signing. `codesign --verify --deep --strict` passes; the embedded development profile includes the user's iPhone 15. Installation awaits phone reconnection.
+- Project regeneration retains the user's local signing configuration. The canonical project staged for Git leaves the development team empty.
+
+## Tycoon checks
+
+- 160 deterministic orders across eight customers generate valid exact fills with rotation zero. Offers are distinct generated puzzles, and unlocked customers always provide another order.
+- Shipping rejects incomplete, altered, or already paid orders. Base pay, optional 20% clean bonus, equipment additions, and van multipliers are verified. Free hints and undo cannot recover a used clean bonus.
+- Purchases check cash, charge once, respect the 12-level cap, and raise later delivery pay. Expansions check cash and delivery gates; an accepted order remains valid after expansion.
+- Two progression simulations ship 250 orders each, one with clean packs and one using hints. Both reach all five depot stages and unlock all eight customers using earnings under the actual rules.
+- Account validation rejects unsafe counters, money, equipment levels, receipt history, and altered order seeds. Session checks reject rotated or duplicate placements. Malformed and invalid board saves retain a valid business within the save envelope's 128 KB limit.
+- Five app-model tests cover once-only shipping and relaunch, partial-board persistence, free hints, order-switch confirmation, purchases with a retained paid receipt or active order, and rejected placement without partial mutation.
+- Native Mac play at the 375-point minimum verified tap and drag placement, undo, hint recovery, partial-order switching, seven shipments, workbench purchase, increased delivery pay, customer unlocks, and the first expansion. The scene changed with the workbench and shopfront. Relaunch retained paid cash and receipt; switching modes preserved the existing Large Free pack box with six shipments and Shift's current run.
+- Native iPhone 18 Pro simulator play verified portrait safe areas, anchored bottom actions and tabs, four manually placed parcels, a $108 clean delivery including the $18 bonus, and the paid receipt. Further physical finger, audio, haptic, and accessibility testing remains.
 
 ## Shift checks
 
@@ -53,10 +66,10 @@ The original checks still pass: 180 generated puzzles across three sizes; 90 hin
 
 ## Physical iPhone installation and remaining checks
 
-Xcode is installed and its license/setup is complete. The iOS 27.0 runtime is installed and the game runs on an iPhone 18 Pro simulator. A signed Debug build was provisioned with the user’s Personal Team, verified with codesign, and installed on a physical iPhone 15 running iOS 26.7.1. The user completed Developer Mode, Keychain authorization, and developer trust, then confirmed Parcel Pack opens. The profile includes the connected device and expires October 19, 2026 at 4:31 PM Eastern. Local Xcode team settings are retained without being committed.
+Xcode is installed and its license/setup is complete. The iOS 27.0 runtime is installed and the game runs on an iPhone 18 Pro simulator. The earlier version 1.0 Debug build was provisioned with the user’s Personal Team, verified with codesign, and installed on a physical iPhone 15 running iOS 26.7.1. The user completed Developer Mode, Keychain authorization, and developer trust, then confirmed Parcel Pack opens. That profile includes the device and expires October 19, 2026 at 4:31 PM Eastern. The tycoon update awaits phone reconnection. Local Xcode team settings are retained without being committed.
 
 Physical finger placement, additional phone sizes and accessibility settings, audio, and haptics still need focused checks. No IPA, TestFlight upload, or App Store release has been made.
 
 ## Contributions
 
-Claude authored the initial SwiftUI views and the first Shift implementation on `claude/optimistic-johnson-nmx2si`. Codex recovered those pushed changes and completed the solver, tuning, save guards, native UI adjustments, tests, and build integration on the same branch. Claude's uncommitted cloud reference files were not fully imported; the core tests and Swift balance script here were implemented locally. Main remains unchanged.
+Claude authored the initial SwiftUI views and the first Shift implementation on `claude/optimistic-johnson-nmx2si`. Codex recovered those pushed changes and completed the solver, tuning, save guards, native UI adjustments, tests, and build integration on the same branch, then added Tycoon with parallel core and interface work and an independent integration review. Claude's uncommitted cloud reference files were not fully imported; the core tests and Swift balance script here were implemented locally. Main remains unchanged.

@@ -3,10 +3,19 @@
 from pathlib import Path
 import hashlib
 import json
+import argparse
+import subprocess
 
 root = Path(__file__).resolve().parents[1]
-project = root / "ParcelPack.xcodeproj"
-project.mkdir(exist_ok=True)
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--output-project", type=Path, help="Write a project elsewhere without changing the local checkout")
+args = parser.parse_args()
+project = args.output_project.resolve() if args.output_project else root / "ParcelPack.xcodeproj"
+existing = {}
+if project.joinpath("project.pbxproj").exists():
+    parsed = subprocess.run(["plutil", "-convert", "json", "-o", "-", str(project / "project.pbxproj")], capture_output=True, check=True)
+    existing = json.loads(parsed.stdout).get("objects", {})
+project.mkdir(parents=True, exist_ok=True)
 
 def ident(name):
     return hashlib.sha256(name.encode()).hexdigest()[:24].upper()
@@ -46,7 +55,7 @@ for mode in ("Debug", "Release"):
     settings = {
         "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
         "CODE_SIGN_STYLE": "Automatic",
-        "CURRENT_PROJECT_VERSION": "1",
+        "CURRENT_PROJECT_VERSION": "2",
         "DEVELOPMENT_TEAM": "",
         "GENERATE_INFOPLIST_FILE": "YES",
         "INFOPLIST_KEY_CFBundleDisplayName": "Parcel Pack",
@@ -55,7 +64,7 @@ for mode in ("Debug", "Release"):
         "INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents": "YES",
         "INFOPLIST_KEY_UILaunchScreen_Generation": "YES",
         "INFOPLIST_KEY_UISupportedInterfaceOrientations": "UIInterfaceOrientationPortrait",
-        "MARKETING_VERSION": "1.0",
+        "MARKETING_VERSION": "1.1",
         "PRODUCT_BUNDLE_IDENTIFIER": "com.giofiore.parcelpack",
         "PRODUCT_NAME": "$(TARGET_NAME)",
         "SUPPORTED_PLATFORMS": "iphoneos iphonesimulator",
@@ -66,6 +75,11 @@ for mode in ("Debug", "Release"):
     }
     if mode == "Debug":
         settings["SWIFT_ACTIVE_COMPILATION_CONDITIONS"] = "DEBUG"
+    # Retain the user's signing choice when adding source files to their local project.
+    local_settings = existing.get(ident("target-" + mode), {}).get("buildSettings", {})
+    for key in ("DEVELOPMENT_TEAM", "PRODUCT_BUNDLE_IDENTIFIER", "CODE_SIGN_STYLE", "CODE_SIGN_IDENTITY", "PROVISIONING_PROFILE_SPECIFIER"):
+        if key in local_settings:
+            settings[key] = local_settings[key]
     build = " ".join(f"{key} = {q(value)};" for key, value in settings.items())
     target_configs.append(obj("target-" + mode, f"isa = XCBuildConfiguration; name = {mode}; buildSettings = {{ {build} }};"))
 

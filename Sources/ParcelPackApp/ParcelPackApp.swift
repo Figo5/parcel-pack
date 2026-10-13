@@ -7,11 +7,12 @@ import ParcelCore
 struct ParcelPackApp: App {
     @State private var model = GameModel()
     @State private var shiftModel = ShiftModel()
+    @State private var tycoonModel = TycoonModel()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
-            RootView(game: model, shift: shiftModel)
+            RootView(game: model, shift: shiftModel, tycoon: tycoonModel)
                 #if os(macOS)
                 .frame(minWidth: 375, idealWidth: 430, minHeight: 700, idealHeight: 850)
                 #endif
@@ -25,6 +26,7 @@ struct ParcelPackApp: App {
             if phase != .active {
                 model.save()
                 shiftModel.save()
+                tycoonModel.save()
             }
         }
     }
