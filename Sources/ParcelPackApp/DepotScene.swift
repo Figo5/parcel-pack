@@ -8,6 +8,8 @@ struct DepotScene: View {
     let account: TycoonAccount
 
     private var stage: Int { account.stage.rawValue }
+    private var workers: Int { account.teams.values.reduce(0) { $0 + $1.workers } }
+    private var managers: Int { account.teams.values.filter(\.hasManager).count }
 
     var body: some View {
         Canvas { context, size in
@@ -18,7 +20,7 @@ struct DepotScene: View {
         }
         .aspectRatio(360.0 / 224.0, contentMode: .fit)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Your \(account.stage.title), workbench level \(account.level(.workbench)), shelves level \(account.level(.shelves)), delivery van level \(account.level(.van))")
+        .accessibilityLabel("Your \(account.stage.title), \(workers) workers and \(managers) managers. Workbench level \(account.level(.workbench)), shelves level \(account.level(.shelves)), delivery van level \(account.level(.van)), label printer level \(account.level(.labels)), conveyor level \(account.level(.conveyor)), dispatch desk level \(account.level(.dispatchDesk)).")
     }
 
     private func drawDepot(in context: inout GraphicsContext) {
@@ -76,6 +78,12 @@ struct DepotScene: View {
             workbench(at: CGPoint(x: 130 + CGFloat(index) * 50, y: 133 + CGFloat(index) * 17),
                       upgraded: account.level(.workbench) > 0, in: &context)
         }
+        if account.level(.labels) > 0 {
+            labelPrinter(at: CGPoint(x: 143, y: 119), in: &context)
+        }
+        if account.level(.dispatchDesk) > 0 || managers > 0 {
+            dispatchDesk(at: CGPoint(x: 227, y: 118), in: &context)
+        }
         for index in 0..<min(6, 1 + stage + account.level(.shelves) / 4) {
             box(at: CGPoint(x: 214 + CGFloat(index % 3) * 17, y: 163 + CGFloat(index % 3) * 6 - CGFloat(index / 3) * 17),
                 width: 17, height: 14, color: Palette.cardboard, in: &context)
@@ -99,6 +107,80 @@ struct DepotScene: View {
                     color: Palette.surface, in: &context)
             context.draw(Text("HUB").font(.system(size: 10, weight: .black, design: .rounded)).foregroundStyle(Palette.accent),
                          at: CGPoint(x: 179, y: 71))
+        }
+        if account.level(.conveyor) > 0 {
+            conveyor(at: CGPoint(x: 103, y: 149), level: account.level(.conveyor), in: &context)
+        }
+        let positions = [CGPoint(x: 116, y: 147), CGPoint(x: 171, y: 165), CGPoint(x: 214, y: 175),
+                         CGPoint(x: 83, y: 125), CGPoint(x: 160, y: 121), CGPoint(x: 256, y: 147)]
+        let visibleWorkers = min(positions.count, workers)
+        if visibleWorkers > 0 {
+            for index in 0..<visibleWorkers {
+                person(at: positions[index], shirt: Palette.parcel(index + 2), manager: false, in: &context)
+            }
+        }
+        for index in 0..<min(3, managers) {
+            person(at: CGPoint(x: 242 + CGFloat(index) * 15, y: 130 + CGFloat(index) * 6),
+                   shirt: Palette.accent, manager: true, in: &context)
+        }
+    }
+
+    private func labelPrinter(at origin: CGPoint, in context: inout GraphicsContext) {
+        context.fill(Path(roundedRect: CGRect(x: origin.x - 6, y: origin.y - 8, width: 15, height: 10), cornerRadius: 2),
+                     with: .color(Palette.ink))
+        context.fill(Path(roundedRect: CGRect(x: origin.x - 3, y: origin.y - 13, width: 9, height: 8), cornerRadius: 1),
+                     with: .color(Palette.surface))
+        line(from: CGPoint(x: origin.x - 1, y: origin.y - 10), to: CGPoint(x: origin.x + 4, y: origin.y - 10),
+             color: Palette.accent, width: 1, in: &context)
+    }
+
+    private func dispatchDesk(at origin: CGPoint, in context: inout GraphicsContext) {
+        let x = origin.x, y = origin.y
+        line(from: CGPoint(x: x - 12, y: y + 2), to: CGPoint(x: x - 12, y: y + 17), color: Palette.ink, width: 3, in: &context)
+        line(from: CGPoint(x: x + 15, y: y + 9), to: CGPoint(x: x + 15, y: y + 23), color: Palette.ink, width: 3, in: &context)
+        polygon([CGPoint(x: x - 17, y: y), CGPoint(x: x - 5, y: y - 5), CGPoint(x: x + 22, y: y + 5), CGPoint(x: x + 10, y: y + 10)],
+                color: Color(hex: 0xDAB987), in: &context)
+        polygon([CGPoint(x: x - 3, y: y - 14), CGPoint(x: x + 12, y: y - 9), CGPoint(x: x + 12, y: y + 1), CGPoint(x: x - 3, y: y - 4)],
+                color: Palette.ink, in: &context)
+        polygon([CGPoint(x: x - 1, y: y - 12), CGPoint(x: x + 10, y: y - 8), CGPoint(x: x + 10, y: y - 1), CGPoint(x: x - 1, y: y - 5)],
+                color: Color(hex: 0x9DCBC6), in: &context)
+    }
+
+    private func conveyor(at origin: CGPoint, level: Int, in context: inout GraphicsContext) {
+        let length = CGFloat(46 + min(30, level))
+        let x = origin.x, y = origin.y, rise = length * 0.35
+        polygon([CGPoint(x: x, y: y), CGPoint(x: x + 8, y: y - 4), CGPoint(x: x + length + 8, y: y + rise - 4), CGPoint(x: x + length, y: y + rise)],
+                color: Palette.ink, in: &context)
+        line(from: CGPoint(x: x, y: y + 2), to: CGPoint(x: x + length, y: y + rise + 2),
+             color: Color(hex: 0x899F8B), width: 3, in: &context)
+        for offset in stride(from: CGFloat(6), through: length - 4, by: 9) {
+            line(from: CGPoint(x: x + offset, y: y + offset * 0.35),
+                 to: CGPoint(x: x + offset + 8, y: y + offset * 0.35 - 4),
+                 color: Palette.surface.opacity(0.45), width: 1, in: &context)
+        }
+        for offset in [CGFloat(8), length - 7] {
+            line(from: CGPoint(x: x + offset, y: y + offset * 0.35 + 2),
+                 to: CGPoint(x: x + offset, y: y + offset * 0.35 + 9),
+                 color: Palette.ink, width: 3, in: &context)
+        }
+        box(at: CGPoint(x: x + length * 0.6, y: y + length * 0.21 - 2), width: 12, height: 10,
+            color: Palette.cardboard, in: &context)
+    }
+
+    private func person(at origin: CGPoint, shirt: Color, manager: Bool, in context: inout GraphicsContext) {
+        let x = origin.x, y = origin.y
+        context.fill(Path(ellipseIn: CGRect(x: x - 6, y: y - 2, width: 13, height: 5)), with: .color(Palette.ink.opacity(0.12)))
+        line(from: CGPoint(x: x - 2, y: y - 8), to: CGPoint(x: x - 3, y: y), color: Palette.ink, width: 3, in: &context)
+        line(from: CGPoint(x: x + 2, y: y - 8), to: CGPoint(x: x + 4, y: y), color: Palette.ink, width: 3, in: &context)
+        context.fill(Path(roundedRect: CGRect(x: x - 5, y: y - 21, width: 10, height: 15), cornerRadius: 3), with: .color(shirt))
+        line(from: CGPoint(x: x - 4, y: y - 18), to: CGPoint(x: x - 8, y: y - 12), color: shirt, width: 3, in: &context)
+        line(from: CGPoint(x: x + 4, y: y - 18), to: CGPoint(x: x + 8, y: y - 14), color: shirt, width: 3, in: &context)
+        context.fill(Path(ellipseIn: CGRect(x: x - 4, y: y - 29, width: 8, height: 9)), with: .color(Color(hex: 0xCDA77E)))
+        if manager {
+            line(from: CGPoint(x: x, y: y - 20), to: CGPoint(x: x, y: y - 12), color: Palette.surface, width: 2, in: &context)
+            context.fill(Path(roundedRect: CGRect(x: x + 5, y: y - 17, width: 6, height: 8), cornerRadius: 1), with: .color(Palette.surface))
+        } else {
+            context.fill(Path(roundedRect: CGRect(x: x - 5, y: y - 30, width: 10, height: 4), cornerRadius: 2), with: .color(shirt))
         }
     }
 

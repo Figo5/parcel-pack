@@ -61,4 +61,33 @@ import Testing
         let duplicate = account.ship(session)
         #expect(duplicate == nil)
     }
+
+    @Test func versionOneBusinessMigratesWithoutLosingMoneyOrCurrentCustomer() throws {
+        let name = "ParcelTycoonMigration.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        var account = TycoonAccount(seed: 118)
+        for _ in 0..<4 {
+            var box = TycoonSession(order: account.offers[0])
+            for placement in box.state.puzzle.solution { _ = box.state.place(placement) }
+            _ = account.ship(box)
+        }
+        let purchased = account.buy(.workbench)
+        #expect(purchased)
+        let order = TycoonOrder.generate(accountSeed: account.seed, sequence: 5, choice: 2, customer: .bookshop)
+        let saved = SavedTycoon(account: account, session: TycoonSession(order: order))
+        var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(saved)) as? [String: Any])
+        var business = try #require(json["account"] as? [String: Any])
+        business.removeValue(forKey: "teams")
+        business.removeValue(forKey: "automatedOrders")
+        json["account"] = business
+        json["version"] = 1
+        json.removeValue(forKey: "staffUpdatedAt")
+        defaults.set(try JSONSerialization.data(withJSONObject: json), forKey: TycoonStore.key)
+        let restored = try #require(TycoonStore(defaults: defaults).load())
+        #expect(restored.account == account)
+        #expect(restored.session == saved.session)
+        #expect(restored.account.level(.workbench) == 1)
+        #expect(restored.staffUpdatedAt == nil)
+    }
 }

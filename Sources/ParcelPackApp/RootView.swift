@@ -5,24 +5,22 @@ import ParcelCore
 
 enum PlayMode: String, CaseIterable {
     case tycoon
-    case shift
     case free
 
     var title: String {
         switch self {
         case .tycoon: return "Tycoon"
-        case .shift: return "Shift"
-        case .free: return "Free pack"
+        case .free: return "Free play"
         }
     }
 }
 
 struct RootView: View {
-    @Bindable var game: GameModel
-    @Bindable var shift: ShiftModel
+    @Bindable var endless: EndlessModel
     @Bindable var tycoon: TycoonModel
     @AppStorage("parcel-pack.mode") private var modeRaw: String = PlayMode.tycoon.rawValue
     @AppStorage("parcel-pack.tycoon-introduced.v1") private var introducedTycoon = false
+    @Environment(\.scenePhase) private var scenePhase
 
     private var selectedMode: PlayMode { PlayMode(rawValue: modeRaw) ?? .tycoon }
 
@@ -55,6 +53,16 @@ struct RootView: View {
                 modeRaw = PlayMode.tycoon.rawValue
                 introducedTycoon = true
             }
+            if PlayMode(rawValue: modeRaw) == nil { modeRaw = PlayMode.tycoon.rawValue }
+        }
+        .task {
+            while !Task.isCancelled {
+                if scenePhase == .active { tycoon.refreshStaff() }
+                do { try await Task.sleep(for: .seconds(1)) } catch { break }
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { tycoon.refreshStaff() }
         }
     }
 
@@ -62,10 +70,8 @@ struct RootView: View {
         switch selectedMode {
         case .tycoon:
             TycoonView(model: tycoon)
-        case .shift:
-            ShiftView(model: shift)
         case .free:
-            GameView(model: game)
+            EndlessView(model: endless)
         }
     }
 }

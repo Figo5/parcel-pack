@@ -1,75 +1,46 @@
 # Parcel Pack validation
 
-Date: October 13, 2026 (America/New_York).
+Date: October 13, 2026 (America/New_York). Current version: **1.2, build 3**.
 
 ## Builds and tests
 
-- **60 tests pass** with Swift 6.4 in Xcode 27.0 (27A266a): 36 core tests and 24 app model tests. The previous 41 checks remain, with 19 added tycoon checks.
-- `zsh scripts/build-mac.sh` produces the current native release app. The script now resolves SwiftPM's actual binary directory, including Xcode 27's build layout, instead of potentially copying a stale binary.
-- The ParcelPack Xcode scheme builds successfully for generic iOS Simulator, Debug, using SDK 27.0 with signing disabled. Both arm64 and x86_64 sources compile. The binary is also installed and running on an iPhone 18 Pro simulator with iOS 27.0 in Device Hub.
-- The project includes all 15 shared Swift source files, a shared scheme, and the existing 1024×1024 opaque app icon. iOS deployment target remains 17.0. Mac and iOS version is 1.1, build 2.
-- The version 1.1 Debug iPhone build succeeds with automatic signing. `codesign --verify --deep --strict` passes; the embedded development profile includes the user's iPhone 15. The update installed and launched successfully on that phone. A filtered device app listing confirms version 1.1, build 2.
-- Project regeneration retains the user's local signing configuration. The canonical project staged for Git leaves the development team empty.
+- **95 Swift tests pass**: 64 core tests in nine suites, 31 app-model tests in six suites. Swift 6.4, Xcode 27.0 (27A266a).
+- Native Mac release packaging succeeds. The build script uses SwiftPM's actual binary path rather than copying an earlier binary.
+- The shared Xcode scheme builds successfully for generic iOS Simulator with signing disabled and for a signed generic iOS device. iOS deployment target remains 17.0. All 20 shared Swift source files compile.
+- `codesign --verify --deep --strict` passes for the signed iPhone artifact. Device Control installed and launched version 1.2/build 3 on the user's iPhone 15 running iOS 26.7.1; a filtered app listing confirms both numbers.
+- Personal signing settings remain local. The canonical Git project leaves the development team empty; regeneration retains the local team.
 
-## Tycoon checks
+## Tycoon and staff
 
-- 160 deterministic orders across eight customers generate valid exact fills with rotation zero. Offers are distinct generated puzzles, and unlocked customers always provide another order.
-- Shipping rejects incomplete, altered, or already paid orders. Base pay, optional 20% clean bonus, equipment additions, and van multipliers are verified. Free hints and undo cannot recover a used clean bonus.
-- Purchases check cash, charge once, respect the 12-level cap, and raise later delivery pay. Expansions check cash and delivery gates; an accepted order remains valid after expansion.
-- Two progression simulations ship 250 orders each, one with clean packs and one using hints. Both reach all five depot stages and unlock all eight customers using earnings under the actual rules.
-- Account validation rejects unsafe counters, money, equipment levels, receipt history, and altered order seeds. Session checks reject rotated or duplicate placements. Malformed and invalid board saves retain a valid business within the save envelope's 128 KB limit.
-- Five app-model tests cover once-only shipping and relaunch, partial-board persistence, free hints, order-switch confirmation, purchases with a retained paid receipt or active order, and rejected placement without partial mutation.
-- Native Mac play at the 375-point minimum verified tap and drag placement, undo, hint recovery, partial-order switching, seven shipments, workbench purchase, increased delivery pay, customer unlocks, and the first expansion. The scene changed with the workbench and shopfront. Relaunch retained paid cash and receipt; switching modes preserved the existing Large Free pack box with six shipments and Shift's current run.
-- Native iPhone 18 Pro simulator play verified portrait safe areas, anchored bottom actions and tabs, four manually placed parcels, a $108 clean delivery including the $18 bonus, and the paid receipt. Further physical finger, audio, haptic, and accessibility testing remains.
+- Deterministic exact-fill orders cover all eight customers with fixed orientations. Shipping pays only a complete current order and cannot repay its receipt. Hints remove only the clean bonus. Purchases cannot overdraw cash and preserve the current box and historical receipt.
+- Two 250-shipment simulations, one clean and one hinted, reach all five depot stages and all eight clients under the actual rules.
+- Six equipment lines now support 30 levels; new label, conveyor, and dispatch effects are checked with the existing workbench/shelf/van effects.
+- Staff tests cover worker costs/caps, unlocked customer requirements, the three-order unmanaged holding limit, fractional progress, manual collection, manager purchase collecting pending work once, automatic shipping, eight-hour catchup, and invalid/nonfinite elapsed time.
+- Pending staff revenue reserves money and counter headroom. Manual payments cannot consume that reserved capacity. Invalid teams, money, counters, order seeds, and receipt history are rejected.
+- Automatic deliveries never change the manual order sequence or last manual receipt. Collected staff deliveries count toward client unlocks and expansion requirements.
+- Version 1 JSON with no staff fields retains the original cash, building, equipment, current customer, and box. Missing new equipment keys read as level 0. Broken nested boards retain a valid business within the 128 KB save limit.
+- Model regression tests keep Circuit Supply selected over shipping, next order, and relaunch. Staff time settles at prior equipment levels before purchases. Income and its production timestamp save together, so relaunch cannot repeat catchup. A backward clock change and return to the prior timestamp produce no duplicate work, including the following half-interval.
+- Independent integration review found and resolved the clock-watermark issue and occupied bounding-box anchor issue for fixed shapes with an empty top-left corner.
 
-## Shift checks
+## Endless Free play
 
-- An independent brute-force oracle matches the value solver on 48 tiny-board cases, including required-parcel constraints; both oracle and solver use fixed orientations. Returned placements are checked for exact coverage and required IDs.
-- 160 deterministic generated plans have five boxes, mixed parcel sizes, surplus parcels, unique IDs, rush deadlines, and valid reference tilings. Branching shapes occur. All reference placements use rotation zero. Paired legacy generation keeps the same IDs, parcel values, deadlines, origins, and targets, so migration preserves progression.
-- 375 generated boxes solve exhaustively. Scores meet or exceed the reference packing value and agree with the reconstructed placements.
-- Branch-and-bound combines the most constrained empty cell with an exact-area knapsack upper bound. The earlier rotation-enabled implementation was compared against its previous solver on 120 generated boxes: zero score mismatches and no capped searches; median time fell from approximately 26.3 ms to 0.22 ms in optimized local builds. Those historical timings describe that earlier sample on this Mac. The fixed-orientation balance sample below uses the current solver and rules.
-- Capped searches return only a valid lower bound, and the interface omits the best-full-box coaching figure unless the search proves optimality.
-- Tests cover invalid placement without mutation, shelf capacity and transfers, full-box doubling, sealing exactly once, ordinary carryover, early rush returns, due-box shelf removal and a single late fee, best-full scoring before expired parcels are removed, cleared/failed progression, and saved phases.
-- Save tests reject damaged quotas, mismatched seeds, inconsistent outcomes, missing arrivals, and overflowing parcel values. A saved quota from the earlier tuning remains valid. Corrupt session data does not erase the separate record; a maximum finished-run counter cannot overflow. Six additional migration tests cover missing legacy markers, retained footprints, incompatible unpacking, preserved shelf/score/quota, sealed snapshots, completed outcomes, idempotent relaunches, and once-only shipment credit.
+- 19 focused core/store/model tests cover generated fixed pieces, invalid placements without mutation, row and column clears, crossing lines counted once, tray refill after all three pieces, deterministic RNG continuation, score/counter accounting, and game-over legal-fit detection.
+- Save checks retain the active board, tray, score, RNG, and best score. A malformed active run preserves a valid best. New game keeps the record and requires confirmation for a live run.
+- Hint highlights a legal placement without awarding points or placing a piece. Occupied bounding-box anchors remain tappable when a shape's actual footprint fits around them.
+- Shift is absent from the mode picker and app lifecycle. Previous Shift and exact-fill Free pack saves remain untouched; the endless run uses its own save key.
 
-## Balance sample
+## Native play checks
 
-The current fixed-orientation Swift engine played 1,000 independent shifts (5,000 boxes), 100 seeds per shift number. The reference strategy packs the generated core fill and keeps no shelf. The strong strategy chooses a best full box with or without mandatory due rush parcels, compares the immediate scores, and shelves valuable leftovers with future rush parcels first. All sampled solver searches finished exhaustively.
+- The Mac 375-point layout restores the pre-update Shopfront, $40 cash, workbench level 1, and paid bookshop box. Crew, customer catalog, all six upgrade rows, and Free play render without clipped controls; the wallet remains visible while depot content scrolls.
+- Played eleven consecutive Little Leaf orders and two Circuit Supply orders through the native interface. Next order retained the customer each time, and the Circuit Supply label and payment stayed selected.
+- Hired a Corner Market worker for $540 and its manager for $1,350. Observed progress advancing, automatic $49 revenue, and total delivery progress increasing independently of the manual order sequence.
+- Bought the label printer for $140 and conveyor for $225. The account deducted the prices after settling older worker pay, and the scene and staff statistics reflected the new equipment. The depot draws the hired worker and manager.
+- In Mac Free play, placed all three initial pieces, scored 90, and observed a new tray. New game requested confirmation; cancelling and relaunching retained score 90, the board, tray, and record.
+- The iPhone 18 Pro simulator shows both modes in portrait with safe areas, the four Tycoon tabs, full 8×8 board, and visible tray/actions. Tap placement scored 40; dragging the second fixed shape scored another 30.
+- Version 1.2/build 3 is installed and launched on the physical iPhone 15. Further physical finger, enlarged-text, audio, haptic, and VoiceOver checks remain. No IPA export, TestFlight upload, or App Store release has been made.
 
-| Shift | Target / reference | Reference clears | Strong strategy clears |
-| --- | --- | --- | --- |
-| 1 | 80% | 100/100 | 100/100 |
-| 2 | 95% | 78/100 | 100/100 |
-| 3 | 105% | 0/100 | 100/100 |
-| 4 | 115% | 0/100 | 91/100 |
-| 5 | 120% | 0/100 | 72/100 |
-| 6 | 125% | 0/100 | 43/100 |
-| 7 | 130% | 0/100 | 11/100 |
-| 8 | 130% | 0/100 | 13/100 |
-| 9 | 130% | 0/100 | 15/100 |
-| 10 | 130% | 0/100 | 11/100 |
+## Retained regression coverage
 
-These are independent shift samples, not continuous-run survival rates. The strong strategy is myopic and is not proof of a globally optimal score, universal quota reachability, or human difficulty. The first shift remains forgiving; later shifts reward choosing valuable parcels and managing carryover. Targets plateau at 130%; rush frequency and generated boxes continue varying. Reproduce with `scripts/measure-shift-balance.swift` using the README command.
+Legacy Shift tests still verify fixed-orientation generated plans, required parcels, shelf carryover, rush fees, best-full-box scoring, saved outcomes, overflow bounds, and old save migration. Original Free pack tests cover exact fills, hints, blocked-hint recovery, bounds/overlap, lifetime counts, and legacy orientation migration. These support shared packing helpers and preserved historical data; those modes are no longer selectable.
 
-## Native renders and play
-
-- Before removing rotation, tested Shift select-and-tap, rejection near the board edge, valid placement, undo, rotation, and dragging the rotated parcel into its landing position. An invalid/outside drag leaves progress intact.
-- Shelved and unshelved a parcel, relaunched with a rotated placed parcel and shelf intact, shipped a partial box, checked its score and coaching figure, then confirmed carryover into the next box.
-- Switched to Free pack and confirmed the previous Large box and six shipped boxes remained intact, then switched back without losing the Shift run.
-- Rendered at 430 points wide and at the 375-point minimum. Shift's Undo/Shelve and Seal controls remain anchored at the bottom while the tray scrolls. Board targets retain at least 44 points at the minimum width. The light palette keeps both mode labels readable regardless of system appearance.
-
-- The rebuilt fixed-shape iPhone app renders in Device Hub with Undo/Shelve/Seal and no Rotate control. A completed first box and transition to box two were observed in the running simulator. Automated core/model checks verify fixed placements, hint completions, and score searches; physical finger behavior remains to be tested.
-
-## Existing Free pack coverage
-
-The original checks still pass: 180 generated puzzles across three sizes; 90 hint completion cases; blocked-hint recovery; rotations including extreme inputs; bounds, overlap, duplicate and unknown IDs; alternate tilings; undo/reset; saved box and settings; once-per-box shipment counting; and preservation of lifetime counts when session data is rejected. The original October 8 native play checks included drag cancellation, hints, size confirmation, and compact layout.
-
-## Physical iPhone installation and remaining checks
-
-Xcode is installed and its license/setup is complete. The iOS 27.0 runtime is installed and the game runs on an iPhone 18 Pro simulator. The version 1.1, build 2 Debug tycoon update was provisioned with the user’s Personal Team, verified with codesign, and installed on a physical iPhone 15 running iOS 26.7.1 on October 13. Device Control reported a successful launch and confirmed the installed version and build. The user previously completed Developer Mode, Keychain authorization, and developer trust, then confirmed the original version opens. The current profile includes the device and expires October 19, 2026 at 4:31 PM Eastern. Local Xcode team settings are retained without being committed.
-
-Physical finger placement, additional phone sizes and accessibility settings, audio, and haptics still need focused checks. No IPA, TestFlight upload, or App Store release has been made.
-
-## Contributions
-
-Claude authored the initial SwiftUI views and the first Shift implementation on `claude/optimistic-johnson-nmx2si`. Codex recovered those pushed changes and completed the solver, tuning, save guards, native UI adjustments, tests, and build integration on the same branch, then added Tycoon with parallel core and interface work and an independent integration review. Claude's uncommitted cloud reference files were not fully imported; the core tests and Swift balance script here were implemented locally. Main remains unchanged.
+Work is backed up on `claude/optimistic-johnson-nmx2si`. Main is unchanged. Build products and orchestration logs remain ignored.

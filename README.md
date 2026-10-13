@@ -1,32 +1,37 @@
 # Parcel Pack
 
-A native SwiftUI packing game for iPhone and Mac. Build a shipping business in **Tycoon**, play a scored **Shift** run, or relax with the original untimed **Free pack**. Boxes are generated on-device. No timer, ads, real-money purchases, accounts, or network dependency.
+A native SwiftUI packing game for iPhone and Mac. Build a shipping business in **Tycoon**, or chase a high score in endless **Free play**. Parcels stay in the orientation shown: no rotation. No ads, real-money purchases, accounts, or network dependency.
 
-## Play
+## Tycoon
 
-Drag a parcel into the cardboard box, or select it and tap the square for its top-left corner. Parcels stay in the orientation shown in the tray; place them without turning. Tap a packed parcel to remove it; **Undo** removes your last placement. Every fresh box has an exact fill, but Shift gives you more parcels than fit.
+Fill a customer box and **Ship** it for cash. Free hints help finish tricky boxes; packing without hints adds a bonus worth 20% of the customer's base pay. Choose a store in **Orders** and keep packing for that store until you select another. Your current customer and partially packed box survive relaunch.
 
-### Tycoon
+Eight customers unlock through deliveries and depot growth. Grow from **Spare room** through **Shopfront**, **Local depot**, and **Warehouse** to a **Shipping hub**. Both your manual shipments and collected staff deliveries count toward these milestones.
 
-- Fill customer boxes, then **Ship** to earn cash. Packing without hints adds a bonus worth 20% of the customer's base pay. Hints are always free; they keep the full base and equipment payout.
-- Choose from three generated orders in **Orders**. Eight customers unlock through deliveries and depot growth, bringing larger boxes and better pay. Switching a partly packed order asks first.
-- Invest in a **Workbench** (+$8 per level), **Storage shelves** (+$4 per level), and **Delivery van** (+10% per level on base and equipment pay). Each has 12 levels. Upgrades apply to future deliveries, including your current unpaid order.
-- Grow from a **Spare room** through **Shopfront**, **Local depot**, and **Warehouse** to a **Shipping hub**. Expansions require both saved cash and completed deliveries; the depot scene changes with your building and equipment.
-- Cash, equipment, active order, and paid receipt save together. A shipped box cannot pay twice, and a damaged board can be replaced while retaining a valid saved business. Shift and Free pack keep their separate progress.
+### Equipment and crew
 
-This first tycoon pass focuses on packing and building the depot. Staff and idle income are future work.
+Six equipment lines each have 30 levels:
 
-### Shift
+| Upgrade | Benefit per level |
+| --- | --- |
+| Workbench | +$8 per delivery |
+| Storage shelves | +$4 per delivery |
+| Label printer | +$6 per delivery |
+| Delivery van | +10% on base and equipment pay |
+| Conveyor belt | Faster worker packing |
+| Dispatch desk | +5% worker payout |
 
-- Each parcel is worth 1–4 points. Pack any subset and **Seal & ship** when ready. A full box doubles the packed value.
-- Keep up to three spare parcels on the **Shelf** for later boxes in the same shift. Unshelve them or pack directly from the shelf. Tray leftovers are returned when you seal.
-- Rush deadlines count boxes, not seconds. Returning a rush parcel early or keeping it on the shelf through its due box costs five points. Ordinary returns have no fee.
-- Meet the target across five boxes to clear the shift and continue the run. Later shifts ask for more valuable packing and better shelf choices. Missing the target ends the run.
-- A shipped box shows its scoring breakdown and the best full-box value available before late fees. The shelf clears between shifts; your best run and current progress save locally.
+In **Crew**, hire teams for the first six stores. Each team supports up to 20 workers. Workers pack orders into a three-order holding area; tap **Collect** to ship them for cash. A manager ships automatically, including up to eight hours of elapsed work while the app is closed. Worker shipments start at half the base/equipment payout and benefit from the van and dispatch desk; they do not receive the manual clean-pack bonus.
 
-### Free pack
+The depot scene reflects your equipment, workers, managers, and building. Cash, equipment, staff, active order, paid receipt, and production timestamp save together. Reopening a paid box or collecting elapsed production twice cannot pay again. Version 1.1 businesses migrate without resetting cash, purchased equipment, building, or the chosen customer.
 
-Fit every parcel into the box. **Hint** places one parcel while keeping a route to completion; it can unpack blocking placements and explains the change. Choose Small (4×4), Medium (5×4), or Large (5×5), then move to another generated box after finishing. The existing box, settings, and shipped count stay saved separately from Shift. Older boxes migrate to fixed shapes, retaining compatible placements and returning incompatible ones to the tray. Earned counts and scores stay saved.
+## Endless Free play
+
+Place fixed pieces on an **8×8** board. You receive three pieces at a time; the tray refills after all three are used. Filling a row or column clears it. Intersecting full rows and columns clear together.
+
+Earn **10 points per placed square** and **100 points per cleared line**. The score keeps building in the same run until none of the remaining pieces fits. Your best score, board, tray, and current score save locally. **Hint** highlights a legal placement without placing it or awarding points. **New game** asks before abandoning a live run. Drag a piece into position, or select it and tap its top-left square.
+
+Shift has been removed from the playable modes. The previous Shift and exact-fill Free pack save keys remain untouched; Free play now has its own saved run and record.
 
 ## Play on this Mac
 
@@ -35,19 +40,19 @@ zsh scripts/build-mac.sh
 open "dist/Parcel Pack.app"
 ```
 
-The build script packages the current SwiftPM release binary into a native app. There are no external package dependencies.
+The script packages the current SwiftPM release binary. There are no external package dependencies.
 
 ## Install on your iPhone
 
-Open **ParcelPack.xcodeproj** and choose the shared **ParcelPack** scheme. The target supports iOS 17 or later; the current checkout has been compiled with Xcode 27.0, Swift 6.4, and the iOS Simulator 27.0 SDK.
+Open **ParcelPack.xcodeproj** and select the shared **ParcelPack** scheme. The target supports iOS 17 or later.
 
-1. Finish Xcode's platform downloads. For simulator play, choose an installed iPhone simulator as the run destination and press **⌘R**.
-2. For your phone, sign in through Xcode Settings → Apple Accounts. Select the ParcelPack target → **Signing & Capabilities**, choose your Personal Team, and leave automatic signing enabled. Use a unique bundle identifier if Xcode requests one.
-3. Connect and unlock the iPhone, trust the Mac, and select the phone as the run destination. Enable Developer Mode if requested, then press **⌘R**. If the first launch asks you to trust the developer, use Settings → General → VPN & Device Management on the phone and trust your own developer entry.
+1. Finish Xcode's platform downloads. For simulator play, choose an installed iPhone simulator and press **⌘R**.
+2. For your phone, sign in through Xcode Settings → Apple Accounts. Select the target → **Signing & Capabilities**, choose your Personal Team, and leave automatic signing enabled.
+3. Connect and unlock the iPhone, trust the Mac, and select it as the run destination. Enable Developer Mode if requested, then press **⌘R**. If first launch requests developer trust, use Settings → General → VPN & Device Management on the phone.
 
-Apple's [device run guide](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices) covers installation. A free Personal Team supports personal device testing with periodic reprovisioning; see [Apple's account overview](https://developer.apple.com/help/account/basics/about-your-developer-account). TestFlight and App Store distribution require separate preparation and have not been performed.
+Once installed, the phone can be disconnected for normal play. Apple's [device run guide](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices) covers installation. TestFlight and App Store distribution have not been performed.
 
-## Development
+## Development and verification
 
 ```sh
 swift test
@@ -56,20 +61,8 @@ xcodebuild -project ParcelPack.xcodeproj -scheme ParcelPack \
   -configuration Debug -derivedDataPath .build/ios CODE_SIGNING_ALLOWED=NO build
 ```
 
-The Xcode target compiles the shared Swift files directly. SwiftPM compiles ParcelCore as a separate module; conditional imports support both. After adding source files, regenerate the project with `python3 scripts/generate-project.py`; regeneration preserves existing local signing settings. The checked-in project leaves the development team empty.
+The Xcode target compiles shared sources directly; SwiftPM compiles ParcelCore separately. After adding source files, regenerate with `python3 scripts/generate-project.py`. Regeneration preserves local signing settings; the checked-in project leaves the development team empty.
 
-To reproduce the balance sample against the actual Swift engine:
+See [VALIDATION.md](VALIDATION.md) for current test and device evidence, [DESIGN.md](DESIGN.md) for rules and presentation, and [AFTER_UPDATE.md](AFTER_UPDATE.md) for continuing native development. Legacy core/model tests remain as regression coverage for retained save data and shared packing helpers.
 
-```sh
-swiftc -O Sources/ParcelCore/Packing.swift Sources/ParcelCore/Shift.swift \
-  scripts/measure-shift-balance.swift -o /tmp/parcel-shift-balance
-/tmp/parcel-shift-balance 100
-```
-
-This samples 100 independent seeds for each of shifts 1–10, comparing reference packing with a strong per-box strategy that manages rush parcels and the shelf. It reports JSON lines; it is not a human difficulty estimate or a globally optimal run solver.
-
-## Verification and contributions
-
-**60 Swift tests pass**, including 500 simulated tycoon deliveries reaching every customer and depot stage with and without hints. Version 1.1 (build 2) builds for Mac, iOS Simulator, and a signed iPhone target. Native play checks cover shipping, upgrades, expansion, and saved progress. The tycoon update is installed and launched on a physical iPhone 15 running iOS 26.7.1. Further phone gesture, audio, and haptic checks remain. See [VALIDATION.md](VALIDATION.md), [DESIGN.md](DESIGN.md), and [AFTER_UPDATE.md](AFTER_UPDATE.md).
-
-Claude contributed the initial SwiftUI presentation and the Shift rules, model, and interface. Codex implemented the original puzzle core and packaging, completed Shift with a faster value solver and fixed orientations, and added the Tycoon economy, persistence, native depot interface, and progression checks. The original focused persistence review used DeepSeek through OpenCode Go. Provider credentials and orchestration logs are excluded from the repository and game.
+Claude contributed the initial native presentation and Shift rules. Codex implemented the puzzle core, packaging, fixed blocks, Tycoon, staff automation, and endless Free play through parallel implementation and independent review. Credentials, build products, and orchestration logs stay outside Git.

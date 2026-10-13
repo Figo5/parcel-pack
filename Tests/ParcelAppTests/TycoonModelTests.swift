@@ -120,4 +120,74 @@ import ParcelCore
         #expect(model.state == state)
         #expect(model.selectedID == parcel.id)
     }
+
+    @Test func chosenCustomerPersistsAcrossShippingNextOrderAndRelaunch() throws {
+        let (name, prefs) = defaults()
+        defer { prefs.removePersistentDomain(forName: name) }
+        var business = TycoonAccount(seed: 742)
+        for _ in 0..<15 {
+            var box = TycoonSession(order: business.offers[0])
+            for placement in box.state.puzzle.solution { _ = box.state.place(placement) }
+            _ = business.ship(box)
+        }
+        let expanded = business.expand()
+        #expect(expanded)
+        let chosen = TycoonOrder.generate(accountSeed: business.seed, sequence: 16, choice: 0, customer: .gadgetShop)
+        #expect(TycoonStore(defaults: prefs).save(SavedTycoon(account: business, session: TycoonSession(order: chosen))))
+        let model = TycoonModel(defaults: prefs)
+        pack(model)
+        model.ship()
+        model.nextOrder()
+        #expect(model.order.customer == .gadgetShop)
+        #expect(model.order.sequence == 17)
+        let restored = TycoonModel(defaults: prefs)
+        pack(restored)
+        restored.ship()
+        restored.nextOrder()
+        #expect(restored.order.customer == .gadgetShop)
+        #expect(restored.order.sequence == 18)
+    }
+
+    @Test func workerCatchupPersistsOnceAndDoesNotBoostPastWorkWithNewEquipment() throws {
+        let (name, prefs) = defaults()
+        defer { prefs.removePersistentDomain(forName: name) }
+        var business = TycoonAccount(seed: 911)
+        for _ in 0..<30 {
+            var box = TycoonSession(order: business.offers[0])
+            for placement in box.state.puzzle.solution { _ = box.state.place(placement) }
+            _ = business.ship(box)
+        }
+        let worker = business.hireWorker(for: .cornerMarket)
+        let manager = business.hireManager(for: .cornerMarket)
+        #expect(worker && manager)
+        var time = Date(timeIntervalSince1970: 1_800_000_000)
+        let active = TycoonSession(order: business.offers[0])
+        #expect(TycoonStore(defaults: prefs).save(SavedTycoon(account: business, session: active, staffUpdatedAt: time)))
+        let model = TycoonModel(defaults: prefs, now: { time })
+        let oldPay = business.workerPayout(for: .cornerMarket)
+        let interval = business.workerInterval(for: .cornerMarket)
+        let oldCash = business.cash
+        let upgradePrice = try #require(business.upgradeCost(.workbench))
+        time = time.addingTimeInterval(interval * 2)
+        model.buy(.workbench)
+        #expect(model.account.cash == oldCash + 2 * oldPay - upgradePrice)
+        #expect(model.account.automatedOrders == 2)
+        #expect(model.session == active)
+        let restored = TycoonModel(defaults: prefs, now: { time })
+        #expect(restored.account == model.account)
+        restored.refreshStaff()
+        #expect(restored.account.automatedOrders == 2)
+        time = time.addingTimeInterval(-60)
+        restored.refreshStaff()
+        #expect(restored.account.automatedOrders == 2)
+        time = time.addingTimeInterval(60)
+        restored.refreshStaff()
+        #expect(restored.account.automatedOrders == 2)
+        time = time.addingTimeInterval(60)
+        restored.refreshStaff()
+        #expect(restored.account.automatedOrders == 2)
+        time = time.addingTimeInterval(60)
+        restored.refreshStaff()
+        #expect(restored.account.automatedOrders == 3)
+    }
 }

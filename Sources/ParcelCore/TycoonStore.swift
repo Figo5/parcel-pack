@@ -1,16 +1,18 @@
 import Foundation
 
 public struct SavedTycoon: Codable, Equatable, Sendable {
-    public var version: Int = 1
+    public var version: Int = 2
     public var account: TycoonAccount
     public var session: TycoonSession?
+    public var staffUpdatedAt: Date?
 
-    public init(account: TycoonAccount, session: TycoonSession?) {
+    public init(account: TycoonAccount, session: TycoonSession?, staffUpdatedAt: Date? = nil) {
         self.account = account
         self.session = session
+        self.staffUpdatedAt = staffUpdatedAt
     }
 
-    private enum CodingKeys: String, CodingKey { case version, account, session }
+    private enum CodingKeys: String, CodingKey { case version, account, session, staffUpdatedAt }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -18,6 +20,7 @@ public struct SavedTycoon: Codable, Equatable, Sendable {
         account = try container.decode(TycoonAccount.self, forKey: .account)
         // A broken board must not make the separately decoded business disappear.
         session = try? container.decodeIfPresent(TycoonSession.self, forKey: .session)
+        staffUpdatedAt = try? container.decodeIfPresent(Date.self, forKey: .staffUpdatedAt)
     }
 
     public func accepts(_ candidate: TycoonSession) -> Bool {
@@ -28,7 +31,13 @@ public struct SavedTycoon: Codable, Equatable, Sendable {
     }
 
     public var isValid: Bool {
-        version == 1 && account.isValid && (session.map(accepts) ?? true)
+        (1...2).contains(version) && account.isValid && (session.map(accepts) ?? true)
+            && (staffUpdatedAt.map(Self.validDate) ?? true)
+    }
+
+    public static func validDate(_ date: Date) -> Bool {
+        let seconds = date.timeIntervalSince1970
+        return seconds.isFinite && (0...4_102_444_800).contains(seconds)
     }
 }
 
@@ -41,8 +50,9 @@ public struct TycoonStore {
     public func load() -> SavedTycoon? {
         guard let data = defaults.data(forKey: Self.key), data.count <= 128_000,
               var saved = try? JSONDecoder().decode(SavedTycoon.self, from: data),
-              saved.version == 1, saved.account.isValid else { return nil }
+              (1...2).contains(saved.version), saved.account.isValid else { return nil }
         if let session = saved.session, !saved.accepts(session) { saved.session = nil }
+        if let date = saved.staffUpdatedAt, !SavedTycoon.validDate(date) { saved.staffUpdatedAt = nil }
         return saved
     }
 

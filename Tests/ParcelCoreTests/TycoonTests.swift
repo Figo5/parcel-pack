@@ -101,8 +101,8 @@ import Testing
 
     @Test func equipmentCapsAreFiniteAndVanScalesBasePlusEquipment() throws {
         var account = TycoonAccount(seed: 4)
-        account.cash = 1_000_000
-        account.totalEarned = 1_000_000
+        account.cash = 20_000_000
+        account.totalEarned = 20_000_000
         account.completedOrders = 1_000
         account.stage = .hub
         let prior = TycoonOrder.generate(accountSeed: account.seed, sequence: 1_000, choice: 0, customer: .makerCollective)
@@ -118,8 +118,8 @@ import Testing
             #expect({ !account.buy(upgrade) }())
         }
         let order = try #require(account.offers.first)
-        let base = order.customer.basePay + 8 * DepotUpgrade.maxLevel + 4 * DepotUpgrade.maxLevel
-        #expect(account.payout(for: completed(order)) == base * 220 / 100 + order.customer.basePay / 5)
+        let base = order.customer.basePay + 18 * DepotUpgrade.maxLevel
+        #expect(account.payout(for: completed(order)) == base * 400 / 100 + order.customer.basePay / 5)
     }
 
     @Test func expandingKeepsTheAlreadyAcceptedOrderValid() throws {
@@ -239,5 +239,32 @@ import Testing
         badLevel.levels[.van] = Int.max
         #expect(!badLevel.isValid)
         #expect(badLevel.upgradeCost(.van) == nil)
+    }
+
+    @Test func versionOneSaveRetainsMoneyProgressEquipmentAndReceipt() throws {
+        var account = TycoonAccount(seed: 818)
+        for _ in 0..<8 {
+            let order = try #require(account.offers.max { $0.customer.basePay < $1.customer.basePay })
+            #expect({ account.ship(completed(order)) != nil }())
+        }
+        #expect({ account.buy(.workbench) }())
+        account.levels.removeValue(forKey: .labels)
+        account.levels.removeValue(forKey: .conveyor)
+        account.levels.removeValue(forKey: .dispatchDesk)
+        var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(account)) as? [String: Any])
+        json.removeValue(forKey: "teams")
+        json.removeValue(forKey: "automatedOrders")
+        let oldSave = try JSONSerialization.data(withJSONObject: json)
+        let migrated = try JSONDecoder().decode(TycoonAccount.self, from: oldSave)
+        #expect(migrated.cash == account.cash)
+        #expect(migrated.totalEarned == account.totalEarned)
+        #expect(migrated.stage == account.stage)
+        #expect(migrated.levels == account.levels)
+        #expect(migrated.completedOrders == account.completedOrders)
+        #expect(migrated.lastDelivery == account.lastDelivery)
+        #expect(migrated.teams.isEmpty)
+        #expect(migrated.automatedOrders == 0)
+        #expect(migrated.isValid)
+        #expect(migrated.offers == account.offers)
     }
 }

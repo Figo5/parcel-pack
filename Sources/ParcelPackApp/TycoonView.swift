@@ -10,11 +10,12 @@ struct TycoonView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private enum Tab: String, CaseIterable {
-        case pack = "Pack", orders = "Orders", depot = "Depot"
+        case pack = "Pack", orders = "Orders", crew = "Crew", depot = "Depot"
         var symbol: String {
             switch self {
             case .pack: "shippingbox"
             case .orders: "list.clipboard"
+            case .crew: "person.2"
             case .depot: "building.2"
             }
         }
@@ -25,6 +26,8 @@ struct TycoonView: View {
     @State private var tab = Tab.pack
     @State private var drag: DragState?
     @State private var boardRect = CGRect.zero
+    @State private var staffFeedback = ""
+    @State private var staffFeedbackCustomer: TycoonCustomer?
     @GestureState private var gestureActive = false
 
     private var puzzle: Puzzle { model.state.puzzle }
@@ -35,10 +38,10 @@ struct TycoonView: View {
         GeometryReader { proxy in
             ScrollView {
                 VStack(spacing: 16) {
-                    header
                     switch tab {
                     case .pack: packingContent(in: proxy.size)
                     case .orders: ordersContent
+                    case .crew: crewContent
                     case .depot: depotContent
                     }
                 }
@@ -51,6 +54,30 @@ struct TycoonView: View {
             .scrollBounceBehavior(.basedOnSize)
             .scrollDisabled(drag != nil)
             .id(tab)
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 8) {
+                header
+                if tab == .pack || tab == .orders {
+                    HStack(spacing: 8) {
+                        Text("Packing for \(model.order.customer.title)")
+                            .font(.footnote.weight(.semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 4)
+                        if tab == .orders {
+                            Button { tab = .pack } label: {
+                                Image(systemName: "arrow.right").frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Return to your \(model.order.customer.title) order")
+                        }
+                    }
+                    .foregroundStyle(Palette.accent)
+                }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .frame(maxWidth: 520).frame(maxWidth: .infinity)
+            .background(Palette.background)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
@@ -220,9 +247,13 @@ struct TycoonView: View {
     }
 
     private func boardCell(x: Int, y: Int, occupant: Int?, pitch p: CGFloat) -> some View {
-        Button {
+        let canPlaceSelected = model.selectedID.map {
+            model.state.canPlace(Placement(parcelID: $0, origin: Cell(x: x, y: y), rotation: 0))
+        } ?? false
+        return Button {
             guard !model.isShipped else { return }
-            if let occupant { model.remove(occupant) }
+            if canPlaceSelected { _ = model.placeSelected(x: x, y: y) }
+            else if let occupant { model.remove(occupant) }
             else { _ = model.placeSelected(x: x, y: y) }
         } label: {
             RoundedRectangle(cornerRadius: p * 0.18)
@@ -236,7 +267,8 @@ struct TycoonView: View {
         .accessibilityLabel("Row \(y + 1), column \(x + 1)")
         .accessibilityValue(occupant.map { "Parcel \($0 + 1)" } ?? "Empty")
         .accessibilityHint(model.isShipped ? "This order has been shipped." :
-            (occupant != nil ? "Take this parcel back out." : "Select a parcel, then place its top-left corner here."))
+            (canPlaceSelected ? "Place the selected parcel's top-left corner here." :
+                occupant != nil ? "Take this parcel back out." : "Select a parcel, then place its top-left corner here."))
     }
 
     private func paidStamp(pitch p: CGFloat) -> some View {
@@ -261,7 +293,7 @@ struct TycoonView: View {
                 Label("Includes \(money(receipt.cleanBonus)) clean-pack bonus", systemImage: "checkmark.seal")
                     .font(.footnote.weight(.medium)).foregroundStyle(Palette.accent)
             }
-            Text("\(model.account.completedOrders) \(model.account.completedOrders == 1 ? "order" : "orders") delivered · Put your earnings to work in Depot.")
+            Text("\(model.account.deliveryCount) \(model.account.deliveryCount == 1 ? "order" : "orders") delivered · Put your earnings to work in Depot.")
                 .font(.footnote).foregroundStyle(Palette.muted)
             Button { tab = .depot } label: { Label("Visit your depot", systemImage: "building.2") }
                 .buttonStyle(PillButtonStyle())
@@ -325,8 +357,18 @@ struct TycoonView: View {
     private var packingActions: some View {
         HStack(spacing: 8) {
             if model.isShipped {
-                Button { model.nextOrder() } label: { Label("Next order", systemImage: "shippingbox") }
-                    .buttonStyle(PillButtonStyle(filled: true))
+                Button { model.nextOrder() } label: {
+                    Label("Next \(model.order.customer.title) order", systemImage: "shippingbox")
+                        .font(.subheadline.weight(.semibold))
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 12).padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .foregroundStyle(Palette.onAccent)
+                        .background(Palette.accent, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Your customer choice stays selected until you change it in Orders.")
             } else {
                 Button { model.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
                     .buttonStyle(PillButtonStyle())
@@ -351,11 +393,8 @@ struct TycoonView: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Choose your next delivery").font(.title2.bold())
-                Text("Every order has a perfect fit. Bigger customers bring bigger boxes and better pay.")
+                Text("Pick a customer. Your next orders stay with them until you choose another.")
                     .font(.subheadline).foregroundStyle(Palette.muted)
-            }
-            ForEach(model.offeredOrders, id: \.choice) { offered in
-                offeredOrder(offered)
             }
             VStack(alignment: .leading, spacing: 8) {
                 Text("Your customers").font(.headline)
@@ -369,6 +408,13 @@ struct TycoonView: View {
                     if customer != TycoonCustomer.allCases.last { Divider().overlay(Palette.grid.opacity(0.5)) }
                 }
             }
+            DisclosureGroup("Choose a different box") {
+                VStack(spacing: 12) {
+                    ForEach(model.offeredOrders, id: \.choice) { offered in offeredOrder(offered) }
+                }
+                .padding(.top, 12)
+            }
+            .font(.subheadline.weight(.semibold))
         }
     }
 
@@ -413,26 +459,216 @@ struct TycoonView: View {
 
     private func customerRow(_ customer: TycoonCustomer) -> some View {
         let unlocked = model.account.isUnlocked(customer)
-        return HStack(alignment: .center, spacing: 12) {
-            Image(systemName: unlocked ? symbol(for: customer) : "lock")
-                .font(.title3).foregroundStyle(unlocked ? Palette.accent : Palette.muted)
-                .frame(width: 36).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(customer.title).font(.subheadline.weight(.semibold))
-                Text(unlocked ? customer.detail : "\(customer.minStage.title) · \(customer.minDeliveries) deliveries")
-                    .font(.caption).foregroundStyle(Palette.muted)
+        let current = model.order.customer == customer
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: unlocked ? symbol(for: customer) : "lock")
+                    .font(.title3).foregroundStyle(unlocked ? Palette.accent : Palette.muted)
+                    .frame(width: 36).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(customer.title).font(.subheadline.weight(.semibold))
+                    Text(unlocked ? customer.detail : "\(customer.minStage.title) · \(customer.minDeliveries) deliveries")
+                        .font(.caption).foregroundStyle(Palette.muted)
+                }
+                Spacer(minLength: 4)
+                if unlocked {
+                    Text(money(customer.basePay)).font(.subheadline.weight(.semibold)).monospacedDigit()
+                } else {
+                    Text("\(min(model.account.deliveryCount, customer.minDeliveries))/\(customer.minDeliveries)")
+                        .font(.caption).monospacedDigit().foregroundStyle(Palette.muted)
+                }
             }
-            Spacer(minLength: 4)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(customer.title). \(unlocked ? "Available. Base pay \(money(customer.basePay))" : "Locked. Requires \(customer.minStage.title) and \(customer.minDeliveries) deliveries. \(model.account.deliveryCount) delivered")")
             if unlocked {
-                Text(money(customer.basePay)).font(.subheadline.weight(.semibold)).monospacedDigit()
-            } else {
-                Text("\(min(model.account.completedOrders, customer.minDeliveries))/\(customer.minDeliveries)")
-                    .font(.caption).monospacedDigit().foregroundStyle(Palette.muted)
+                HStack(spacing: 12) {
+                    Text(current ? "Your selected customer" : "\(customer.size.width) × \(customer.size.height) box")
+                        .font(.caption.weight(.medium)).foregroundStyle(current ? Palette.accent : Palette.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button {
+                        if current && !model.isShipped {
+                            tab = .pack
+                        } else {
+                            model.requestCustomer(customer)
+                            if model.pendingOrder == nil { tab = .pack }
+                        }
+                    } label: {
+                        Label(current && !model.isShipped ? "Continue" : "Pack", systemImage: "arrow.right")
+                    }
+                    .buttonStyle(PillButtonStyle(filled: current))
+                    .frame(maxWidth: 140)
+                    .accessibilityLabel(current && !model.isShipped ? "Continue your \(customer.title) order" : "Pack orders for \(customer.title)")
+                    .accessibilityHint("Future orders stay with this customer until you choose another.")
+                }
             }
         }
         .padding(.vertical, 12)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(customer.title). \(unlocked ? "Available. Base pay \(money(customer.basePay))" : "Locked. Requires \(customer.minStage.title) and \(customer.minDeliveries) deliveries. \(model.account.completedOrders) delivered")")
+    }
+
+    // MARK: Crew
+
+    private var crewContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("A little help with the boxes").font(.title2.bold())
+                Text("Hire a team for each customer. Workers pack up to three orders, then wait for you to collect. A manager keeps shipments moving automatically.")
+                    .font(.subheadline).foregroundStyle(Palette.muted)
+                Label("Works while you're away · up to 8 hours", systemImage: "moon.zzz")
+                    .font(.caption.weight(.medium)).foregroundStyle(Palette.accent)
+            }
+            HStack {
+                Text("Customer teams").font(.headline)
+                Spacer(minLength: 8)
+                Text("\(model.account.automatedOrders) staff deliveries")
+                    .font(.caption).foregroundStyle(Palette.muted).monospacedDigit()
+            }
+            VStack(spacing: 0) {
+                ForEach(TycoonAccount.automatableCustomers, id: \.self) { customer in
+                    crewRow(customer)
+                    if customer != TycoonAccount.automatableCustomers.last {
+                        Divider().overlay(Palette.grid.opacity(0.5))
+                    }
+                }
+            }
+            if !model.staffMessage.isEmpty {
+                Text(model.staffMessage).font(.footnote).foregroundStyle(Palette.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func crewRow(_ customer: TycoonCustomer) -> some View {
+        let unlocked = model.account.isUnlocked(customer)
+        let team = model.account.teams[customer]
+        let workers = team?.workers ?? 0
+        let managed = team?.hasManager ?? false
+        let pending = team?.pendingOrders ?? 0
+        let pendingCash = team?.pendingCash ?? 0
+        let interval = model.account.workerInterval(for: customer)
+        let progress = min(interval, max(0, team?.progressSeconds ?? 0))
+        let waiting = !managed && pending >= 3
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: unlocked ? symbol(for: customer) : "lock")
+                    .font(.title3).foregroundStyle(unlocked ? Palette.accent : Palette.muted)
+                    .frame(width: 32, height: 40).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(customer.title).font(.headline)
+                    Text(unlocked ? "\(workers) \(workers == 1 ? "worker" : "workers")\(managed ? " · managed" : "")"
+                         : "\(customer.minStage.title) · \(customer.minDeliveries) deliveries")
+                        .font(.caption).foregroundStyle(Palette.muted)
+                }
+                Spacer(minLength: 4)
+                if managed {
+                    Image(systemName: "checkmark.seal.fill").foregroundStyle(Palette.accent)
+                        .accessibilityLabel("Manager hired")
+                }
+            }
+            if unlocked {
+                HStack(spacing: 8) {
+                    Text("\(money(model.account.workerPayout(for: customer))) per order")
+                    Spacer(minLength: 4)
+                    Text(workers > 0 ? "\(Int(interval.rounded(.up)))s / order" : "Hire to start")
+                        .monospacedDigit()
+                }
+                .font(.caption.weight(.medium)).foregroundStyle(Palette.muted)
+                if workers > 0 {
+                    ProgressView(value: waiting ? 1 : progress / max(interval, 1), total: 1)
+                        .tint(waiting ? Palette.stamp : Palette.accent)
+                        .accessibilityLabel("\(customer.title) packing progress")
+                        .accessibilityValue(waiting ? "Storage full. Collect three orders to continue." : "\(Int(progress / max(interval, 1) * 100)) percent")
+                    HStack {
+                        Text(managed ? "Auto-shipping to your cash" : waiting ? "Storage full · collect to keep packing" : "\(pending)/3 orders waiting")
+                            .font(.caption).foregroundStyle(waiting ? Palette.stamp : Palette.muted)
+                        Spacer(minLength: 4)
+                        if !managed {
+                            Button {
+                                performStaffAction(for: customer) { model.collectStaff(for: customer) }
+                            } label: {
+                                Text("Collect \(money(pendingCash))")
+                            }
+                            .buttonStyle(PillButtonStyle(filled: pendingCash > 0))
+                            .frame(maxWidth: 160)
+                            .disabled(pendingCash <= 0)
+                            .accessibilityLabel("Collect \(pending) \(customer.title) orders for \(money(pendingCash))")
+                        }
+                    }
+                }
+                HStack(spacing: 8) {
+                    if let cost = model.account.workerCost(for: customer) {
+                        Button {
+                            performStaffAction(for: customer) { model.hireWorker(for: customer) }
+                        } label: {
+                            Text("\(workers == 0 ? "Hire" : "Add worker") · \(money(cost))")
+                        }
+                        .buttonStyle(PillButtonStyle())
+                        .disabled(!model.account.canHireWorker(for: customer))
+                        .accessibilityLabel("Hire worker \(workers + 1) for \(customer.title), \(money(cost))")
+                    } else {
+                        Label("20 workers", systemImage: "checkmark")
+                            .font(.caption.weight(.medium)).foregroundStyle(Palette.accent)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    if managed {
+                        Label("Managed", systemImage: "checkmark.seal")
+                            .font(.caption.weight(.semibold)).foregroundStyle(Palette.accent)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    } else if let cost = model.account.managerCost(for: customer) {
+                        Button {
+                            performStaffAction(for: customer, announce: false) { model.hireManager(for: customer) }
+                        } label: { Text("Manager · \(money(cost))") }
+                            .buttonStyle(PillButtonStyle())
+                            .disabled(!model.account.canHireManager(for: customer))
+                            .accessibilityLabel("Hire manager for \(customer.title), \(money(cost))")
+                            .accessibilityHint("Automatically ships this team's orders. Hire a worker first.")
+                    }
+                }
+                if workers == 0 {
+                    Text(hireRequirement(for: customer))
+                        .font(.caption).foregroundStyle(Palette.muted)
+                } else if !managed {
+                    Text(managerRequirement(for: customer))
+                        .font(.caption).foregroundStyle(Palette.muted)
+                } else if let cost = model.account.workerCost(for: customer), cost > model.account.cash {
+                    Text("Save \(money(cost - model.account.cash)) more for another worker.")
+                        .font(.caption).foregroundStyle(Palette.muted)
+                }
+                if staffFeedbackCustomer == customer && !staffFeedback.isEmpty {
+                    Text(staffFeedback).font(.caption.weight(.medium)).foregroundStyle(Palette.accent)
+                }
+            } else {
+                Text(customerUnlockRequirement(customer))
+                    .font(.caption).foregroundStyle(Palette.muted)
+            }
+        }
+        .padding(.vertical, 16)
+    }
+
+    private func performStaffAction(for customer: TycoonCustomer, announce: Bool = true, action: () -> Void) {
+        action()
+        staffFeedbackCustomer = customer
+        staffFeedback = model.staffMessage
+        if announce && !staffFeedback.isEmpty { AccessibilityNotification.Announcement(staffFeedback).post() }
+    }
+
+    private func hireRequirement(for customer: TycoonCustomer) -> String {
+        guard let cost = model.account.workerCost(for: customer) else { return "Your team is fully staffed." }
+        if cost > model.account.cash { return "Save \(money(cost - model.account.cash)) more to hire. A manager needs a worker first." }
+        return "Your first worker starts packing straight away."
+    }
+
+    private func managerRequirement(for customer: TycoonCustomer) -> String {
+        guard let cost = model.account.managerCost(for: customer) else { return "Orders ship automatically." }
+        if cost > model.account.cash { return "Save \(money(cost - model.account.cash)) more for automatic shipping." }
+        return "Hire a manager to remove the three-order storage limit."
+    }
+
+    private func customerUnlockRequirement(_ customer: TycoonCustomer) -> String {
+        let remaining = max(0, customer.minDeliveries - model.account.deliveryCount)
+        let needsBuilding = model.account.stage.rawValue < customer.minStage.rawValue
+        if needsBuilding && remaining > 0 { return "Move to your \(customer.minStage.title.lowercased()) and deliver \(remaining) more orders." }
+        if needsBuilding { return "Move to your \(customer.minStage.title.lowercased()) in Depot." }
+        return "Deliver \(remaining) more orders to unlock this team."
     }
 
     // MARK: Depot
@@ -445,12 +681,25 @@ struct TycoonView: View {
             }
             DepotScene(account: model.account)
                 .padding(.horizontal, -8)
+            Button { tab = .crew } label: {
+                HStack {
+                    Label("\(model.account.teams.values.reduce(0) { $0 + $1.workers }) workers", systemImage: "person.2")
+                    Spacer(minLength: 8)
+                    Text("Visit Crew")
+                    Image(systemName: "arrow.right")
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Palette.accent)
+                .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Visit Crew. \(model.account.teams.values.reduce(0) { $0 + $1.workers }) workers in your depot.")
             stageTrail
             expansion
             HStack {
                 Text("Make it your own").font(.headline)
                 Spacer()
-                Text("\(model.account.completedOrders) delivered")
+                Text("\(model.account.deliveryCount) delivered")
                     .font(.caption).foregroundStyle(Palette.muted)
             }
             ForEach(DepotUpgrade.allCases, id: \.self) { upgrade in equipmentRow(upgrade) }
@@ -496,14 +745,14 @@ struct TycoonView: View {
                         .accessibilityHidden(true)
                 }
                 HStack {
-                    Label("\(min(model.account.completedOrders, required))/\(required) deliveries", systemImage: "checkmark.seal")
+                    Label("\(min(model.account.deliveryCount, required))/\(required) deliveries", systemImage: "checkmark.seal")
                     Spacer()
                     Text("\(money(min(model.account.cash, cost)))/\(money(cost))")
                         .monospacedDigit()
                 }
                 .font(.caption.weight(.medium))
                 .foregroundStyle(Palette.muted)
-                ProgressView(value: Double(min(model.account.completedOrders, required)), total: Double(max(required, 1)))
+                ProgressView(value: Double(min(model.account.deliveryCount, required)), total: Double(max(required, 1)))
                     .tint(Palette.accent)
                     .accessibilityLabel("Delivery requirement for expansion")
                 Button { model.expand() } label: {
@@ -543,7 +792,7 @@ struct TycoonView: View {
                     HStack {
                         Text(upgrade.title).font(.headline)
                         Spacer(minLength: 4)
-                        Text("Lv. \(level)").font(.caption.weight(.semibold)).foregroundStyle(Palette.muted)
+                        Text("Lv. \(level)/\(DepotUpgrade.maxLevel)").font(.caption.weight(.semibold)).foregroundStyle(Palette.muted)
                     }
                     Text(upgrade.detail).font(.footnote).foregroundStyle(Palette.muted)
                 }
@@ -710,6 +959,9 @@ struct TycoonView: View {
         case .workbench: "wrench.and.screwdriver"
         case .shelves: "cabinet"
         case .van: "truck.box"
+        case .labels: "printer"
+        case .conveyor: "arrow.right.square"
+        case .dispatchDesk: "desktopcomputer"
         }
     }
     private func equipmentBenefit(_ upgrade: DepotUpgrade) -> String {
@@ -717,10 +969,13 @@ struct TycoonView: View {
         case .workbench: "+$8 per delivery"
         case .shelves: "+$4 per delivery"
         case .van: "+10% shipment pay per level"
+        case .labels: "+$6 per delivery"
+        case .conveyor: "+5% worker speed per level"
+        case .dispatchDesk: "+5% worker pay per level"
         }
     }
     private func expansionRequirement(cost: Int, deliveries: Int) -> String {
-        let remaining = max(0, deliveries - model.account.completedOrders)
+        let remaining = max(0, deliveries - model.account.deliveryCount)
         let cash = max(0, cost - model.account.cash)
         if remaining > 0 && cash > 0 { return "Deliver \(remaining) more orders and save \(money(cash)) more." }
         if remaining > 0 { return "Deliver \(remaining) more orders to make the move." }
@@ -741,9 +996,16 @@ private struct TycoonHelpSheet: View {
                     Label("Hints are free and place one parcel. An order packed without hints earns a 20% base-pay bonus.", systemImage: "lightbulb")
                 }
                 Section("Build your business") {
-                    Label("Use Orders to pick a customer. Bigger clients unlock as you make deliveries and expand.", systemImage: "list.clipboard")
-                    Label("Visit Depot to buy better workbenches, shelves and delivery vans. Each upgrade improves shipment pay.", systemImage: "building.2")
-                    Label("Save cash and reach the delivery goal to move into a bigger building. Your depot changes as it grows.", systemImage: "building.2.crop.circle")
+                    Label("Use Orders to pack for any unlocked customer. That customer stays selected for each next order until you choose another.", systemImage: "list.clipboard")
+                    Label("Workbench, shelves, vans and label printers improve shipment pay. Each has 30 upgrade levels.", systemImage: "building.2")
+                    Label("Conveyors help staff pack faster. Dispatch desks improve staff shipment pay.", systemImage: "arrow.right.square")
+                    Label("Your own deliveries and shipped staff orders both unlock customers and count toward bigger buildings.", systemImage: "building.2.crop.circle")
+                }
+                Section("Build a crew") {
+                    Label("The first six customers can each have up to 20 workers. More workers make that team pack faster.", systemImage: "person.2")
+                    Label("A team stores three orders, then pauses. Collect them in Crew to ship the boxes and bank the cash.", systemImage: "tray.and.arrow.down")
+                    Label("Hire a manager after your first worker to ship that customer's orders automatically and remove the storage limit.", systemImage: "person.crop.circle.badge.checkmark")
+                    Label("Staff keep working while the app is closed, for up to eight hours between visits. Your own packing order stays saved.", systemImage: "moon.zzz")
                 }
                 Section("Take your time") {
                     Text("No timer or lives. Your order, cash and depot save as you play. Buying upgrades never resets the box you're packing.")
