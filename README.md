@@ -60,3 +60,7 @@ The development Mac initially had Swift 6.1.2 and the macOS SDK, but no Xcode, i
 ## Contributions
 
 Claude Code contributed the SwiftUI presentation. DeepSeek through OpenCode Go reviewed the state and persistence code; its initial engine task reached its reasoning limit without producing code. Codex implemented the puzzle engine and tests, state model, persistence, Xcode packaging, integration and verification. Provider credentials stay in their existing stores; orchestration logs are excluded from the app.
+
+## License
+
+Released under the [MIT License](LICENSE). Copyright (c) 2026 Gio Fiore.
