@@ -2,7 +2,6 @@
 
 A native SwiftUI packing puzzle for iPhone. Fit every colorful parcel into its cardboard box. No timer, ads, accounts, lives, purchases, or network dependency. New boxes are generated on-device with guaranteed solutions.
 
-Continuing after updating this Mac? Start with [AFTER_UPDATE.md](AFTER_UPDATE.md).
 
 ## Play
 
