@@ -15,7 +15,18 @@ A native SwiftUI packing puzzle for iPhone. Fit every colorful parcel into its c
 
 ## Install on your iPhone
 
-This checkout includes **ParcelPack.xcodeproj** and a shared **ParcelPack** scheme. Requires iOS 17 or later and Xcode 16 or later with the iOS platform installed. Choose an Xcode release compatible with both your Mac and your iPhone's iOS version using [Apple's compatibility table](https://developer.apple.com/xcode/system-requirements). This Mac runs macOS 15.7.9, which supports Xcode 26.3; newer Xcode releases may require a macOS upgrade.
+This checkout includes **ParcelPack.xcodeproj** and a shared **ParcelPack** scheme. Requires iOS 17 or later and Xcode 16 or later with the iOS platform installed. Choose an Xcode release compatible with both your Mac and your iPhone's iOS version using [Apple's compatibility table](https://developer.apple.com/xcode/system-requirements).
+
+Clone the source on your Mac:
+
+```sh
+git clone https://github.com/Figo5/parcel-pack.git
+cd parcel-pack
+```
+
+**Current distribution:** source only. An iOS compilation, simulator run, and
+physical iPhone installation remain unverified; [VALIDATION.md](VALIDATION.md)
+records the completed macOS checks and remaining device checks.
 
 1. Install [Xcode from Apple](https://developer.apple.com/xcode/), then open `ParcelPack.xcodeproj`.
 2. In Xcode → Settings → Apple Accounts, sign in with your own Apple Account.
@@ -55,7 +66,9 @@ xcodebuild -project ParcelPack.xcodeproj -scheme ParcelPack \
 
 ## Verification status
 
-The development Mac initially had Swift 6.1.2 and the macOS SDK, but no Xcode, iOS SDK or iPhone simulator. The iOS project can be inspected and packaged here; an iOS compilation and physical iPhone installation require Xcode. Detailed final checks are recorded in `VALIDATION.md`.
+Core tests and the shared SwiftUI presentation were checked on macOS. The
+iOS target still requires compilation and device verification with Xcode.
+Environment details and remaining checks are recorded in [VALIDATION.md](VALIDATION.md).
 
 ## Contributions
 
