@@ -21,8 +21,6 @@ This Mac has Command Line Tools and the macOS SDK, but **no Xcode or iOS SDK**. 
 
 The prepared `ParcelPack.xcodeproj` uses automatic signing with no developer team selected. The user must select their own Apple Account/Personal Team in Xcode and run on their iPhone. Nothing has been published to the App Store or TestFlight.
 
-## Orchestration
+## Persistence checks
 
-Claude Code authored the initial SwiftUI views. Codex adjusted the compact tray, implemented the engine, persistence and state model, generated the Xcode project, and performed testing and integration.
-
-DeepSeek v4.1 Flash's initial engine task and first focused review both stopped at their reasoning limit without returning code or findings. A focused review with **DeepSeek v4 Flash through OpenCode Go** completed, found no blocking issues and identified two save edges; both were fixed and regression-tested. Credentials and provider logs are not bundled with the game or source download.
+A focused review identified two save edge cases; both were fixed and regression-tested.
